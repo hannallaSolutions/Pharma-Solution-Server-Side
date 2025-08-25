@@ -255,8 +255,7 @@ namespace SearchTool_ServerSide.Repository
                     ("ClassV5","EPC + MOA + Route"),
                     ("ClassV6","EPC + MOA like if a =>{x,y} ,b=>{y},c=>{x} then a can get y and c and b can get only and z can get a only it's only depend on the source drug search"),
                     ("ClassV7","EPC + MOA + ROUTE"),
-                    ("ClassV8","EPC + MOA + ROUTE"),
-                    ("ClassV9","EPC + MOA + ROUTE or drug Class exact match"),
+                    ("ClassV8","EPC + MOA + ROUTE or drug Class exact match"),
 
 
                 };
@@ -290,8 +289,8 @@ namespace SearchTool_ServerSide.Repository
                     (record.ClassV4,"ClassV4"),
                     (record.ClassV5,"ClassV5"),
                     (record.PHARM_CLASSES,"ClassV6"),
+                    (record.PHARM_CLASSES,"ClassV7"),
                     (record.PHARM_CLASSES,"ClassV8"),
-                    (record.PHARM_CLASSES,"ClassV9"),
                 };
 
                 for (int i = 0; i < tempClassType.Count; i++)
@@ -318,7 +317,7 @@ namespace SearchTool_ServerSide.Repository
                                 }
                             }
                         }
-                        else if (type == "ClassV8")
+                        else if (type == "ClassV7")
                         {
                             var raw = tempClassType[i].Item1 ?? string.Empty;
                             var items = Regex.Split(raw.Trim(), @"(?<=\])\s*,\s*")
@@ -433,7 +432,7 @@ namespace SearchTool_ServerSide.Repository
                         //     }
 
                         // }
-                        else if (type == "ClassV9")
+                        else if (type == "ClassV8")
                         {
                             var raw = tempClassType[i].Item1 ?? record.DrugClass;
                             var items = Regex.Split(raw.Trim(), @"(?<=\])\s*,\s*")
@@ -509,47 +508,39 @@ namespace SearchTool_ServerSide.Repository
                             if (epcs.Count > 0 && routeExists)
                             {
                                 foreach (var epc in epcs)
-                                    AddCombo("EPC_ROUTE", epc, route);                                // EPC|Route
+                                    AddCombo("EPC_ROUTE", epc, route);                                
                             }
-
-                            // MoA + Route
                             if (moas.Count > 0 && routeExists)
                             {
                                 foreach (var moa in moas)
-                                    AddCombo("MOA_ROUTE", moa, route);                                // MoA|Route
+                                    AddCombo("MOA_ROUTE", moa, route);                               
                             }
 
-                            // EPC (singles)
                             if (epcs.Count > 0)
                             {
                                 foreach (var epc in epcs)
-                                    AddCombo("EPC", epc);                                             // EPC
+                                    AddCombo("EPC", epc);    
                             }
-
-                            // MoA (singles)
                             if (moas.Count > 0)
                             {
                                 foreach (var moa in moas)
-                                    AddCombo("MOA", moa);                                             // MoA
+                                    AddCombo("MOA", moa);                                           
                             }
-
-                            // If there is NO EPC and NO MoA → take what's available
                             if (moas.Count == 0 && epcs.Count == 0)
                             {
                                 if (routeExists)
                                 {
-                                    AddCombo("ROUTE", route);                                         // Route only
+                                    AddCombo("ROUTE", route);                                         
                                 }
                                 else
                                 {
                                     // Totally empty → fallback to record.DrugClass
                                     var fallback = record?.DrugClass?.Trim();
                                     if (!string.IsNullOrWhiteSpace(fallback))
-                                        AddCombo("FALLBACK_DRUGCLASS", fallback);                     // DrugClass only
+                                        AddCombo("FALLBACK_DRUGCLASS", fallback);                     
                                 }
                             }
 
-                            // TODO: If you persist routes in DB, iterate `routes` here and upsert.
                         }
                         else
                         {
@@ -649,8 +640,9 @@ namespace SearchTool_ServerSide.Repository
                     (record.ClassV4,"ClassV4"),
                     (record.ClassV5,"ClassV5"),
                     (record.PHARM_CLASSES,"ClassV6"),
+                    (record.PHARM_CLASSES,"ClassV7"),
                     (record.PHARM_CLASSES,"ClassV8"),
-                    (record.PHARM_CLASSES,"ClassV9"),
+
                 };
 
                 string tempNdc = NormalizeNdcTo11Digits(record.NDC);
@@ -684,7 +676,7 @@ namespace SearchTool_ServerSide.Repository
                                     }
                                 }
                             }
-                            else if (classType.Name == "ClassV8")
+                            else if (classType.Name == "ClassV7")
                             {
                                 var raw = tempClassType[i].Item1 ?? string.Empty;
 
@@ -830,7 +822,7 @@ namespace SearchTool_ServerSide.Repository
                             //     }
                             // }
 
-                            else if (classType.Name == "ClassV9")
+                            else if (classType.Name == "ClassV8")
                             {
                                 // Raw value
                                 var raw = tempClassType[i].Item1 ?? record.DrugClass;

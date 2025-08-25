@@ -84,6 +84,7 @@ var allowedOrigins = new List<string>
 {
     "https://medisearchtool.com",
     "https://pharmacy.medisearchtool.com",
+    "https://medi-dev-test.hanna-west.com/",
     "http://localhost:5173",
         "http://localhost:5174",
         "http://127.0.0.1:8000",
