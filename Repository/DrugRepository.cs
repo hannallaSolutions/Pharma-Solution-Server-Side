@@ -508,36 +508,36 @@ namespace SearchTool_ServerSide.Repository
                             if (epcs.Count > 0 && routeExists)
                             {
                                 foreach (var epc in epcs)
-                                    AddCombo("EPC_ROUTE", epc, route);                                
+                                    AddCombo("EPC_ROUTE", epc, route);
                             }
                             if (moas.Count > 0 && routeExists)
                             {
                                 foreach (var moa in moas)
-                                    AddCombo("MOA_ROUTE", moa, route);                               
+                                    AddCombo("MOA_ROUTE", moa, route);
                             }
 
                             if (epcs.Count > 0)
                             {
                                 foreach (var epc in epcs)
-                                    AddCombo("EPC", epc);    
+                                    AddCombo("EPC", epc);
                             }
                             if (moas.Count > 0)
                             {
                                 foreach (var moa in moas)
-                                    AddCombo("MOA", moa);                                           
+                                    AddCombo("MOA", moa);
                             }
                             if (moas.Count == 0 && epcs.Count == 0)
                             {
                                 if (routeExists)
                                 {
-                                    AddCombo("ROUTE", route);                                         
+                                    AddCombo("ROUTE", route);
                                 }
                                 else
                                 {
                                     // Totally empty → fallback to record.DrugClass
                                     var fallback = record?.DrugClass?.Trim();
                                     if (!string.IsNullOrWhiteSpace(fallback))
-                                        AddCombo("FALLBACK_DRUGCLASS", fallback);                     
+                                        AddCombo("FALLBACK_DRUGCLASS", fallback);
                                 }
                             }
 
@@ -2336,11 +2336,10 @@ namespace SearchTool_ServerSide.Repository
             return item;
         }
 
-
-
         internal async Task<DrugsAlternativesReadDto> GetDetails(string ndc, int insuranceId)
         {
             var query = from di in _context.DrugInsurances
+                        join d in _context.Drugs on ndc equals d.NDC
                         join irx in _context.InsuranceRxes on di.InsuranceId equals irx.Id
                         join ipcn in _context.InsurancePCNs on irx.InsurancePCNId equals ipcn.Id
                         join ins in _context.Insurances on ipcn.InsuranceId equals ins.Id
@@ -2359,6 +2358,7 @@ namespace SearchTool_ServerSide.Repository
                             pcnId = ipcn.Id,
                             rxgroupId = irx.Id,
                             binId = ins.Id,
+                            drug = d
 
                         };
 
@@ -2380,6 +2380,7 @@ namespace SearchTool_ServerSide.Repository
             {
                 dto.Quantity = 1;
             }
+            dto.DrugName = result.drug.Name;
             return dto;
         }
 
@@ -2424,7 +2425,7 @@ namespace SearchTool_ServerSide.Repository
             return items;
         }
 
-        private async Task<ICollection<DrugsAlternativesReadDto>> GetAllDrugsAlternativesDynamic(int classTypeId, string sourceDrugNDC)
+        private async Task<ICollection<DrugsAlternativesReadDto>> GetAllDrugsAlternativesDynamic(int classTypeId, string sourceDrugNDC, int pageNumber, int pageSize)
         {
             // 1) Find the source drug
             var sourceDrug = await _context.Drugs
@@ -2564,7 +2565,7 @@ namespace SearchTool_ServerSide.Repository
                     dto.Quantity = 1;
 
                 return dto;
-            })
+            }).Skip((pageNumber - 1) * pageSize).Take(pageSize)
             // Optional: de-dupe if alternatives appear via multiple class infos
             // .GroupBy(x => new { x.NDCCode, x.rxgroupId })
             // .Select(g => g.First())
@@ -2573,12 +2574,12 @@ namespace SearchTool_ServerSide.Repository
             return result;
         }
 
-        internal async Task<ICollection<DrugsAlternativesReadDto>> GetAllDrugs(int classInfoId, string sourceDrugNDC)
+        internal async Task<ICollection<DrugsAlternativesReadDto>> GetAllDrugs(int classInfoId, string sourceDrugNDC, int pageNumber, int pageSize)
         {
             var tempCLass = await _context.ClassInfos.FirstOrDefaultAsync(x => x.Id == classInfoId);
             if (tempCLass.ClassTypeId >= 7)
             {
-                return await GetAllDrugsAlternativesDynamic(tempCLass.ClassTypeId, sourceDrugNDC);
+                return await GetAllDrugsAlternativesDynamic(tempCLass.ClassTypeId, sourceDrugNDC, pageNumber, pageSize);
             }
             var query =
                 from dc in _context.DrugClasses
@@ -2691,12 +2692,501 @@ namespace SearchTool_ServerSide.Repository
                     dto.Quantity = 1;
 
                 return dto;
-            }).ToList();
+            }).Skip((pageNumber - 1) * pageSize).Take(pageSize).ToList();
 
             return result;
         }
 
+        // Returns ONLY alternatives that have insurance, filtered by rxgroup/pcn/bin,
+        // sorted by Net DESC, paged (10 per page by default).
 
+
+        // Put this inside your service class (private is fine)
+        private sealed class BaseRow
+        {
+            public DrugClass Dc { get; init; } = default!;
+            public Drug D { get; init; } = default!;
+            public ClassInfo Ci { get; init; } = default!;
+        }
+        public sealed class PagedResult<T>
+        {
+            public required IReadOnlyList<T> Items { get; init; }
+            public required int TotalCount { get; init; }
+            public required int TotalPages { get; init; }
+            public required int PageNumber { get; init; }
+            public required int PageSize { get; init; }
+        }
+
+        public sealed class AlternativesFilterOptionsDto
+        {
+            public List<string> RxGroups { get; init; } = new();
+            public List<string> Pcns { get; init; } = new();
+            public List<string> Bins { get; init; } = new();
+        }
+
+        public sealed class DrugAlternativeLiteDto
+        {
+            public int DrugId { get; set; }
+            public string DrugName { get; set; } = "";
+            public string NDCCode { get; set; } = "";
+            public int DrugClassId { get; set; }
+            public string DrugClass { get; set; } = "";
+            public string Form { get; set; } = "";
+            public string Strength { get; set; } = "";
+            public string StrengthUnit { get; set; } = "";
+            public string Route { get; set; } = "";
+            public string Type { get; set; } = "";
+            public string TECode { get; set; } = "";
+            public string ApplicationNumber { get; set; } = "";
+            public string ApplicationType { get; set; } = "";
+            public int Stock { get; set; }
+            public string? BranchName { get; set; }
+        }
+        public async Task<PagedResult<DrugsAlternativesReadDto>> GetAlternativesWithInsurance(
+            int classInfoId,
+            string sourceDrugNDC,
+            int pageNumber = 1,
+            int pageSize = 10,
+            string? rxgroup = null,
+            string? pcn = null,
+            string? bin = null)
+        {
+            if (pageNumber < 1) pageNumber = 1;
+            if (pageSize <= 0) pageSize = 10;
+            if (pageSize > 100) pageSize = 100;
+
+            var classInfo = await _context.ClassInfos.AsNoTracking()
+                .FirstOrDefaultAsync(ci => ci.Id == classInfoId);
+            if (classInfo == null)
+                return new PagedResult<DrugsAlternativesReadDto>
+                {
+                    Items = Array.Empty<DrugsAlternativesReadDto>(),
+                    TotalCount = 0,
+                    TotalPages = 0,
+                    PageNumber = pageNumber,
+                    PageSize = pageSize
+                };
+
+            var sourceDrug = await _context.Drugs.AsNoTracking()
+                .FirstOrDefaultAsync(d => d.NDC == sourceDrugNDC);
+            if (sourceDrug == null)
+                return new PagedResult<DrugsAlternativesReadDto>
+                {
+                    Items = Array.Empty<DrugsAlternativesReadDto>(),
+                    TotalCount = 0,
+                    TotalPages = 0,
+                    PageNumber = pageNumber,
+                    PageSize = pageSize
+                };
+
+            IQueryable<BaseRow> baseSet;
+
+            if (classInfo.ClassTypeId >= 7)
+            {
+                var sourceClassIds = await (
+                    from dc in _context.DrugClasses.AsNoTracking()
+                    join ci in _context.ClassInfos.AsNoTracking() on dc.ClassId equals ci.Id
+                    where dc.DrugId == sourceDrug.Id && ci.ClassTypeId == classInfo.ClassTypeId
+                    select dc.ClassId
+                ).Distinct().ToListAsync();
+
+                if (sourceClassIds.Count == 0)
+                    return new PagedResult<DrugsAlternativesReadDto>
+                    {
+                        Items = Array.Empty<DrugsAlternativesReadDto>(),
+                        TotalCount = 0,
+                        TotalPages = 0,
+                        PageNumber = pageNumber,
+                        PageSize = pageSize
+                    };
+
+                baseSet =
+                    from dc in _context.DrugClasses
+                    join d in _context.Drugs on dc.DrugId equals d.Id
+                    join ci in _context.ClassInfos on dc.ClassId equals ci.Id
+                    where sourceClassIds.Contains(dc.ClassId)
+                          && ci.ClassTypeId == classInfo.ClassTypeId
+                          && d.NDC != sourceDrugNDC
+                    select new BaseRow { Dc = dc, D = d, Ci = ci };
+            }
+            else
+            {
+                baseSet =
+                    from dc in _context.DrugClasses
+                    join d in _context.Drugs on dc.DrugId equals d.Id
+                    join ci in _context.ClassInfos on dc.ClassId equals ci.Id
+                    where dc.ClassId == classInfoId && d.NDC != sourceDrugNDC
+                    select new BaseRow { Dc = dc, D = d, Ci = ci };
+            }
+
+            var query =
+                from br in baseSet
+                join di in _context.DrugInsurances on br.Dc.DrugId equals di.DrugId
+                join ir in _context.InsuranceRxes
+                    .Include(x => x.InsurancePCN)
+                    .ThenInclude(x => x.Insurance)
+                    on di.InsuranceId equals ir.Id
+                join dbGroup in _context.DrugBranches
+                    on new { DrugNDC = br.D.NDC, BranchId = di.BranchId }
+                    equals new { dbGroup.DrugNDC, dbGroup.BranchId } into dbGroup
+                from db in dbGroup.DefaultIfEmpty()
+                let latestReport =
+                    _context.Reports
+                        .Include(r => r.InsuranceStatus)
+                        .Where(r => r.SourceDrugNDC == sourceDrugNDC
+                                    && r.TargetDrugNDC == di.NDCCode
+                                    && r.InsuranceRxId == di.InsuranceId)
+                        .OrderByDescending(r => r.StatusDate)
+                        .ThenByDescending(r => r.Id)
+                        .FirstOrDefault()
+                select new
+                {
+                    Drug = br.D,
+                    DrugClass = br.Dc,
+                    ClassInfo = br.Ci,
+                    DrugInsurance = di,
+                    InsuranceRx = ir,
+                    DrugBranch = db,
+                    LatestReport = latestReport
+                };
+
+            // Optional: case-insensitive filters (uncomment if needed)
+            // var rx = rxgroup?.ToLower(); var p = pcn?.ToLower(); var b = bin?.ToLower();
+            if (!string.IsNullOrWhiteSpace(rxgroup))
+                query = query.Where(x => x.InsuranceRx.RxGroup == rxgroup /* || x.InsuranceRx.RxGroup.ToLower() == rx */);
+            if (!string.IsNullOrWhiteSpace(pcn))
+                query = query.Where(x => x.InsuranceRx.InsurancePCN != null && x.InsuranceRx.InsurancePCN.PCN == pcn /* || x.InsuranceRx.InsurancePCN.PCN.ToLower() == p */);
+            if (!string.IsNullOrWhiteSpace(bin))
+                query = query.Where(x => x.InsuranceRx.InsurancePCN != null
+                                      && x.InsuranceRx.InsurancePCN.Insurance != null
+                                      && x.InsuranceRx.InsurancePCN.Insurance.Bin == bin /* || x.InsuranceRx.InsurancePCN.Insurance.Bin.ToLower() == b */);
+
+            var projected = await query.AsNoTracking().ToListAsync();
+
+            var branchDict = await _context.Branches.AsNoTracking().ToDictionaryAsync(b => b.Id);
+
+            var grouped = projected
+                .GroupBy(x => new { x.DrugInsurance.NDCCode, x.InsuranceRx.Id })
+                .Select(g =>
+                {
+                    var best = g.OrderByDescending(r => r.DrugInsurance.Net).First();
+
+                    var di = best.DrugInsurance;
+                    var ir = best.InsuranceRx;
+                    var latest = best.LatestReport;
+
+                    var dto = _mapper.Map<DrugsAlternativesReadDto>(di);
+                    dto.DrugName = best.Drug.Name;
+                    dto.NDCCode = best.Drug.NDC;
+                    dto.DrugClassId = best.DrugClass.Id;
+                    dto.DrugClass = best.ClassInfo.Name;
+                    dto.Quantity = di.Quantity > 0 ? di.Quantity : 1;
+                    dto.ApplicationNumber = best.Drug.ApplicationNumber;
+                    dto.ApplicationType = best.Drug.ApplicationType;
+                    dto.Route = best.Drug.Route;
+                    dto.Strength = best.Drug.Strength;
+                    dto.Form = best.Drug.Form;
+                    dto.Ingrdient = best.Drug.Ingrdient;
+                    dto.StrengthUnit = best.Drug.StrengthUnit;
+                    dto.Type = best.Drug.Type;
+                    dto.TECode = best.Drug.TECode;
+                    dto.Stock = best.DrugBranch?.Stock ?? 0;
+                    dto.ScriptCode = di.ScriptCode;
+
+                    dto.insuranceName = ir.RxGroup;
+                    dto.pcn = ir.InsurancePCN?.PCN;
+                    dto.bin = ir.InsurancePCN?.Insurance?.Bin;
+                    dto.rxgroup = ir.RxGroup;
+                    dto.BinFullName = ir.InsurancePCN?.Insurance?.Name;
+                    dto.binId = ir.InsurancePCN?.Insurance?.Id ?? 0;
+                    dto.pcnId = ir.InsurancePCN?.Id ?? 0;
+                    dto.rxgroupId = ir.Id;
+
+                    dto.Status = latest?.Status ?? "Not Available";
+                    dto.StatusDescription = latest?.StatusDescription ?? "No additional information";
+                    dto.AdditionalInfo = latest?.AdditionalInfo;
+                    dto.StatusDate = latest?.StatusDate;
+                    dto.SubmitedUser = latest?.UserEmail ?? "";
+                    dto.ApprovedStatus = latest?.InsuranceStatus?.ApprovedStatus ?? "NA";
+                    dto.PriorAuthorizationStatus = latest?.InsuranceStatus?.PriorAuthorizationStatus ?? "NA";
+
+                    if (branchDict.TryGetValue(di.BranchId, out var branch))
+                        dto.branchName = branch.Name;
+
+                    if (dto.Quantity == 0) dto.Quantity = 1;
+                    return dto;
+                })
+                .OrderByDescending(x => x.Net)   // <-- ensure matches DTO property name
+                .ToList();
+
+            var totalCount = grouped.Count;
+            var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+            var skip = (pageNumber - 1) * pageSize;
+            var items = grouped.Skip(skip).Take(pageSize).ToList();
+
+            return new PagedResult<DrugsAlternativesReadDto>
+            {
+                Items = items,
+                TotalCount = totalCount,
+                TotalPages = totalPages,
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            };
+        }
+
+        public async Task<AlternativesFilterOptionsDto> GetAlternativesWithInsuranceFilters(
+            int classInfoId,
+            string sourceDrugNDC,
+            string? rxgroup = null,
+            string? pcn = null,
+            string? bin = null)
+        {
+            var classInfo = await _context.ClassInfos.AsNoTracking().FirstOrDefaultAsync(ci => ci.Id == classInfoId);
+            if (classInfo == null) return new AlternativesFilterOptionsDto();
+
+            var sourceDrug = await _context.Drugs.AsNoTracking().FirstOrDefaultAsync(d => d.NDC == sourceDrugNDC);
+            if (sourceDrug == null) return new AlternativesFilterOptionsDto();
+
+            IQueryable<BaseRow> baseSet;
+
+            if (classInfo.ClassTypeId >= 7)
+            {
+                var sourceClassIds = await (
+                    from dc in _context.DrugClasses.AsNoTracking()
+                    join ci in _context.ClassInfos.AsNoTracking() on dc.ClassId equals ci.Id
+                    where dc.DrugId == sourceDrug.Id && ci.ClassTypeId == classInfo.ClassTypeId
+                    select dc.ClassId
+                ).Distinct().ToListAsync();
+
+                if (sourceClassIds.Count == 0) return new AlternativesFilterOptionsDto();
+
+                baseSet =
+                    from dc in _context.DrugClasses
+                    join d in _context.Drugs on dc.DrugId equals d.Id
+                    join ci in _context.ClassInfos on dc.ClassId equals ci.Id
+                    where sourceClassIds.Contains(dc.ClassId)
+                          && ci.ClassTypeId == classInfo.ClassTypeId
+                          && d.NDC != sourceDrugNDC
+                    select new BaseRow { Dc = dc, D = d, Ci = ci };
+            }
+            else
+            {
+                baseSet =
+                    from dc in _context.DrugClasses
+                    join d in _context.Drugs on dc.DrugId equals d.Id
+                    join ci in _context.ClassInfos on dc.ClassId equals ci.Id
+                    where dc.ClassId == classInfoId && d.NDC != sourceDrugNDC
+                    select new BaseRow { Dc = dc, D = d, Ci = ci };
+            }
+
+            // Base relation that only includes rows WITH insurance
+            var rel =
+                from br in baseSet
+                join di in _context.DrugInsurances on br.Dc.DrugId equals di.DrugId
+                join ir in _context.InsuranceRxes on di.InsuranceId equals ir.Id
+                select new { ir };
+
+            // Cascading lists:
+            // RxGroups depend on PCN+BIN filters
+            var rxQuery = rel.AsQueryable();
+            if (!string.IsNullOrWhiteSpace(pcn))
+                rxQuery = rxQuery.Where(x => x.ir.InsurancePCN != null && x.ir.InsurancePCN.PCN == pcn);
+            if (!string.IsNullOrWhiteSpace(bin))
+                rxQuery = rxQuery.Where(x => x.ir.InsurancePCN != null
+                                          && x.ir.InsurancePCN.Insurance != null
+                                          && x.ir.InsurancePCN.Insurance.Bin == bin);
+
+            var rxgroups = await rxQuery
+                .Select(x => x.ir.RxGroup)
+                .Where(v => v != null && v != "")
+                .Distinct()
+                .OrderBy(v => v)
+                .ToListAsync();
+
+            // PCNs depend on RxGroup+BIN filters
+            var pcnQuery = rel.AsQueryable();
+            if (!string.IsNullOrWhiteSpace(rxgroup))
+                pcnQuery = pcnQuery.Where(x => x.ir.RxGroup == rxgroup);
+            if (!string.IsNullOrWhiteSpace(bin))
+                pcnQuery = pcnQuery.Where(x => x.ir.InsurancePCN != null
+                                            && x.ir.InsurancePCN.Insurance != null
+                                            && x.ir.InsurancePCN.Insurance.Bin == bin);
+
+            var pcns = await pcnQuery
+                .Select(x => x.ir.InsurancePCN!.PCN!)
+                .Where(v => v != null && v != "")
+                .Distinct()
+                .OrderBy(v => v)
+                .ToListAsync();
+
+            // BINs depend on RxGroup+PCN filters
+            var binQuery = rel.AsQueryable();
+            if (!string.IsNullOrWhiteSpace(rxgroup))
+                binQuery = binQuery.Where(x => x.ir.RxGroup == rxgroup);
+            if (!string.IsNullOrWhiteSpace(pcn))
+                binQuery = binQuery.Where(x => x.ir.InsurancePCN != null && x.ir.InsurancePCN.PCN == pcn);
+
+            var bins = await binQuery
+                .Select(x => x.ir.InsurancePCN!.Insurance!.Bin!)
+                .Where(v => v != null && v != "")
+                .Distinct()
+                .OrderBy(v => v)
+                .ToListAsync();
+
+            return new AlternativesFilterOptionsDto
+            {
+                RxGroups = rxgroups,
+                Pcns = pcns,
+                Bins = bins
+            };
+        }
+
+
+        public async Task<PagedResult<DrugAlternativeLiteDto>> GetAlternativesNoInsurancePaged(
+            int classInfoId,
+            string sourceDrugNDC,
+            int pageNumber = 1,
+            int pageSize = 10)
+        {
+            if (pageNumber < 1) pageNumber = 1;
+            if (pageSize <= 0) pageSize = 10;
+
+            var classInfo = await _context.ClassInfos.AsNoTracking()
+                .FirstOrDefaultAsync(ci => ci.Id == classInfoId);
+
+            if (classInfo == null)
+            {
+                return new PagedResult<DrugAlternativeLiteDto>
+                {
+                    Items = Array.Empty<DrugAlternativeLiteDto>(),
+                    TotalCount = 0,
+                    TotalPages = 0,
+                    PageNumber = pageNumber,
+                    PageSize = pageSize
+                };
+            }
+
+            var sourceDrug = await _context.Drugs.AsNoTracking()
+                .FirstOrDefaultAsync(d => d.NDC == sourceDrugNDC);
+
+            if (sourceDrug == null)
+            {
+                return new PagedResult<DrugAlternativeLiteDto>
+                {
+                    Items = Array.Empty<DrugAlternativeLiteDto>(),
+                    TotalCount = 0,
+                    TotalPages = 0,
+                    PageNumber = pageNumber,
+                    PageSize = pageSize
+                };
+            }
+
+            IQueryable<BaseRow> baseSet;
+
+            if (classInfo.ClassTypeId >= 7)
+            {
+                var sourceClassIds = await (
+                    from dc in _context.DrugClasses.AsNoTracking()
+                    join ci in _context.ClassInfos.AsNoTracking() on dc.ClassId equals ci.Id
+                    where dc.DrugId == sourceDrug.Id && ci.ClassTypeId == classInfo.ClassTypeId
+                    select dc.ClassId
+                ).Distinct().ToListAsync();
+
+                if (sourceClassIds.Count == 0)
+                {
+                    return new PagedResult<DrugAlternativeLiteDto>
+                    {
+                        Items = Array.Empty<DrugAlternativeLiteDto>(),
+                        TotalCount = 0,
+                        TotalPages = 0,
+                        PageNumber = pageNumber,
+                        PageSize = pageSize
+                    };
+                }
+
+                baseSet =
+                    from dc in _context.DrugClasses
+                    join d in _context.Drugs on dc.DrugId equals d.Id
+                    join ci in _context.ClassInfos on dc.ClassId equals ci.Id
+                    where sourceClassIds.Contains(dc.ClassId)
+                          && ci.ClassTypeId == classInfo.ClassTypeId
+                          && d.NDC != sourceDrugNDC
+                    select new BaseRow { Dc = dc, D = d, Ci = ci };
+            }
+            else
+            {
+                baseSet =
+                    from dc in _context.DrugClasses
+                    join d in _context.Drugs on dc.DrugId equals d.Id
+                    join ci in _context.ClassInfos on dc.ClassId equals ci.Id
+                    where dc.ClassId == classInfoId
+                          && d.NDC != sourceDrugNDC
+                    select new BaseRow { Dc = dc, D = d, Ci = ci };
+            }
+
+            // Optional branch info (default branch = 1 if you follow that convention)
+            var flat = await (
+                from br in baseSet
+                join dbGroup in _context.DrugBranches
+                    on new { DrugNDC = br.D.NDC, BranchId = 1 }
+                    equals new { dbGroup.DrugNDC, dbGroup.BranchId } into dbGroup
+                from db in dbGroup.DefaultIfEmpty()
+                select new
+                {
+                    br.D,
+                    br.Dc,
+                    br.Ci,
+                    DrugBranch = db
+                }
+            ).AsNoTracking().ToListAsync();
+
+            // De-dup by NDC (since a drug could appear via multiple classes within same classType)
+            var dedup = flat
+                .GroupBy(x => x.D.NDC)
+                .Select(g =>
+                {
+                    // choose the row with highest stock, then by name
+                    var best = g.OrderByDescending(r => r.DrugBranch != null ? r.DrugBranch.Stock : 0)
+                                .ThenBy(r => r.D.Name)
+                                .First();
+
+                    return new DrugAlternativeLiteDto
+                    {
+                        DrugId = best.D.Id,
+                        DrugName = best.D.Name,
+                        NDCCode = best.D.NDC,
+                        DrugClassId = best.Dc.Id,
+                        DrugClass = best.Ci.Name,
+                        Form = best.D.Form,
+                        Strength = best.D.Strength,
+                        StrengthUnit = best.D.StrengthUnit,
+                        Route = best.D.Route,
+                        Type = best.D.Type,
+                        TECode = best.D.TECode,
+                        ApplicationNumber = best.D.ApplicationNumber,
+                        ApplicationType = best.D.ApplicationType,
+                        Stock = best.DrugBranch?.Stock ?? 0,
+                        BranchName = ""
+                    };
+                })
+                // default ordering for UX: by name asc, then by stock desc (tweak to your taste)
+                .OrderBy(x => x.DrugName)
+                .ThenByDescending(x => x.Stock)
+                .ToList();
+
+            var totalCount = dedup.Count;
+            var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+            var skip = (pageNumber - 1) * pageSize;
+
+            return new PagedResult<DrugAlternativeLiteDto>
+            {
+                Items = dedup.Skip(skip).Take(pageSize).ToList(),
+                TotalCount = totalCount,
+                TotalPages = totalPages,
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            };
+        }
         internal async Task<Drug> GetDrugById(int id)
         {
             var item = await _context.Drugs.FirstOrDefaultAsync(x => x.Id == id);

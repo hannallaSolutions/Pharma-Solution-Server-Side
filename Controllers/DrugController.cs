@@ -6,6 +6,7 @@ using SearchTool_ServerSide.Dtos.ScritpsDto;
 using SearchTool_ServerSide.Models;
 using SearchTool_ServerSide.Services;
 using ServerSide.Models;
+using static SearchTool_ServerSide.Repository.DrugRepository;
 
 namespace SearchTool_ServerSide.Controllers
 {
@@ -82,7 +83,7 @@ namespace SearchTool_ServerSide.Controllers
             return Ok(item);
         }
 
-        [HttpGet("GetDetails")]
+        [HttpGet("GetDetails"), AllowAnonymous]
         public async Task<IActionResult> GetDetails([FromQuery] string ndc, [FromQuery] int insuranceId)
         {
             var items = await _drugService.GetDetails(ndc, insuranceId);
@@ -100,7 +101,7 @@ namespace SearchTool_ServerSide.Controllers
             var item = await _drugService.getClassbyId(id);
             return Ok(item);
         }
-        [HttpGet("GetClassesByDrugId")]
+        [HttpGet("GetClassesByDrugId"), AllowAnonymous]
         public async Task<IActionResult> GetClassesByDrugId([FromQuery] int drugId)
         {
             var items = await _drugService.GetClassesByDrugId(drugId);
@@ -127,12 +128,12 @@ namespace SearchTool_ServerSide.Controllers
         }
 
         [HttpGet("GetAllDrugs")]
-        public async Task<IActionResult> GetAllDrugs([FromQuery] int classId,[FromQuery] string sourceDrugNDC)
+        public async Task<IActionResult> GetAllDrugs([FromQuery] int classId, [FromQuery] string sourceDrugNDC, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20)
         {
-            var items = await _drugService.GetAllDrugs(classId, sourceDrugNDC);
+            var items = await _drugService.GetAllDrugs(classId, sourceDrugNDC, pageNumber, pageSize);
             return Ok(items);
         }
-        [HttpGet("GetDrugById")]
+        [HttpGet("GetDrugById"), AllowAnonymous]
         public async Task<IActionResult> GetDrugById([FromQuery] int id)
         {
             var item = await _drugService.GetDrugById(id);
@@ -318,7 +319,44 @@ namespace SearchTool_ServerSide.Controllers
             var result = await _drugService.CleanAndMergeClasses();
             return Ok(result);
         }
-        
+
+        [HttpGet("GetAlternativesWithInsurance"), AllowAnonymous]
+        public async Task<IActionResult> GetAlternativesWithInsurance(
+            [FromQuery] int classInfoId,
+            [FromQuery] string sourceDrugNDC,
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? rxgroup = null,
+            [FromQuery] string? pcn = null,
+            [FromQuery] string? bin = null)
+        {
+            var items = await _drugService.GetAlternativesWithInsurance(
+                classInfoId, sourceDrugNDC, pageNumber, pageSize, rxgroup, pcn, bin);
+            return Ok(items);
+        }
+        [HttpGet("GetAlternativesWithInsuranceFilters"), AllowAnonymous]
+        public async Task<ActionResult<AlternativesFilterOptionsDto>> GetAlternativesWithInsuranceFilters(
+            [FromQuery] int classInfoId,
+            [FromQuery] string sourceDrugNDC,
+            [FromQuery] string? rxgroup = null,
+            [FromQuery] string? pcn = null,
+            [FromQuery] string? bin = null)
+        {
+            var result = await _drugService.GetAlternativesWithInsuranceFilters(
+                classInfoId, sourceDrugNDC, rxgroup, pcn, bin);
+            return Ok(result);
+        }
+        // YourNamespace/Controllers/DrugController.cs
+        [HttpGet("GetAlternativesNoInsurance"),AllowAnonymous]
+        public async Task<ActionResult<PagedResult<DrugAlternativeLiteDto>>> GetAlternativesNoInsurance(
+            [FromQuery] int classInfoId,
+            [FromQuery] string sourceDrugNDC,
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10)
+        {
+            var result = await _drugService.GetAlternativesNoInsurancePaged(classInfoId, sourceDrugNDC, pageNumber, pageSize);
+            return Ok(result);
+        }
 
     }
 }

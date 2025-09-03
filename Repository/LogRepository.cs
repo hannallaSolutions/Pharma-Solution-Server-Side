@@ -30,14 +30,17 @@ namespace SearchTool_ServerSide.Repository
             var mainCompanyId = user.Branch.MainCompanyId;
 
             // Query logs for all users whose branch belongs to the same main company
+            var excluded = new[] { "wael", "emad", "ali", "mina", "andrew" };
+
             var items = await (
                 from log in _context.Logs
                 join usr in _context.Users on log.User.Id equals usr.Id
                 join branch in _context.Branches on usr.BranchId equals branch.Id
                 where branch.MainCompanyId == mainCompanyId
+                      // exclude those users (case-insensitive)
+                      && !excluded.Contains((usr.Name ?? "").ToLower())
                 select new { log, usr }
-            )
-            .ToListAsync();
+            ).ToListAsync();
 
             var dtos = items.Select(x => new LogsReadDto
             {

@@ -9,6 +9,7 @@ using SearchTool_ServerSide.Dtos.ScritpsDto;
 using SearchTool_ServerSide.Models;
 using SearchTool_ServerSide.Repository;
 using ServerSide.Models;
+using static SearchTool_ServerSide.Repository.DrugRepository;
 
 namespace SearchTool_ServerSide.Services
 {
@@ -112,9 +113,9 @@ namespace SearchTool_ServerSide.Services
             return items;
         }
 
-        internal async Task<ICollection<DrugsAlternativesReadDto>> GetAllDrugs(int classId,string sourceDrugNDC)
+        internal async Task<ICollection<DrugsAlternativesReadDto>> GetAllDrugs(int classId, string sourceDrugNDC, int pageNumber, int pageSize)
         {
-            var items = await _drugRepository.GetAllDrugs(classId, sourceDrugNDC);
+            var items = await _drugRepository.GetAllDrugs(classId, sourceDrugNDC, pageNumber, pageSize);
             return items;
         }
 
@@ -283,6 +284,29 @@ namespace SearchTool_ServerSide.Services
         internal async Task<int> CleanAndMergeClasses()
         {
             return await _drugRepository.CleanAndMergeClasses();
+        }
+        public async Task<PagedResult<DrugsAlternativesReadDto>> GetAlternativesWithInsurance(
+        int classInfoId,
+        string sourceDrugNDC,
+        int pageNumber = 1,
+        int pageSize = 10,
+        string? rxgroup = null,
+        string? pcn = null,
+        string? bin = null)
+        {
+            return await _drugRepository.GetAlternativesWithInsurance(classInfoId, sourceDrugNDC, pageNumber, pageSize, rxgroup, pcn, bin);
+        }
+        internal async Task<AlternativesFilterOptionsDto> GetAlternativesWithInsuranceFilters(int classInfoId, string sourceDrugNDC, string? rxgroup = null, string? pcn = null, string? bin = null)
+        {
+            return await _drugRepository.GetAlternativesWithInsuranceFilters(classInfoId, sourceDrugNDC, rxgroup, pcn, bin);
+        }
+        public async Task<PagedResult<DrugAlternativeLiteDto>> GetAlternativesNoInsurancePaged(
+            int classInfoId,
+            string sourceDrugNDC,
+            int pageNumber = 1,
+            int pageSize = 10)
+        {
+            return await _drugRepository.GetAlternativesNoInsurancePaged(classInfoId, sourceDrugNDC, pageNumber, pageSize);
         }
     }
 }
