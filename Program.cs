@@ -80,35 +80,28 @@ builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddMemoryCache();
 
-// Exact origins you want to allow (no "*")
-var allowedOrigins = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+var allowedOrigins = new List<string>
 {
     "https://medisearchtool.com",
     "https://pharmacy.medisearchtool.com",
     "https://medi-dev-test.hanna-west.com",
     "https://medi-beta-dev.brightpointsummit.com",
+    "https://medi-beta-dev.brightpointsummit.com/",
     "http://localhost:5173",
-    "http://localhost:5174",
-    "http://127.0.0.1:8000"
+        "http://localhost:5174",
+        "http://127.0.0.1:8000",
+        "*"
+
 };
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("CorsPolicy", policy =>
     {
-        // Allow the explicit list above + any subdomain of brightpointsummit.com (optional)
-        policy.SetIsOriginAllowed(origin =>
-        {
-            if (allowedOrigins.Contains(origin)) return true;
-
-            if (Uri.TryCreate(origin, UriKind.Absolute, out var uri))
-                return uri.Host.EndsWith(".brightpointsummit.com", StringComparison.OrdinalIgnoreCase);
-
-            return false;
-        })
-        .AllowAnyHeader()
-        .AllowAnyMethod()
-        .AllowCredentials();
+        policy.WithOrigins(allowedOrigins.ToArray())
+              .AllowCredentials()
+              .AllowAnyHeader()
+              .AllowAnyMethod();
     });
 });
 
