@@ -80,10 +80,17 @@ builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddMemoryCache();
 
+
 var allowedOrigins = new List<string>
 {
-   
-        "*"
+    "https://medisearchtool.com",
+    "https://pharmacy.medisearchtool.com",
+    "https://medi-dev-test.hanna-west.com",
+    "https://medi-beta-dev.brightpointsummit.com",
+    "http://medi-beta-dev.brightpointsummit.com",
+    "http://localhost:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:8000",
 
 };
 
@@ -91,12 +98,13 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("CorsPolicy", policy =>
     {
-        policy.SetIsOriginAllowed(_ => true) // allow all origins
+        policy.WithOrigins(allowedOrigins.ToArray())
               .AllowCredentials()
               .AllowAnyHeader()
               .AllowAnyMethod();
     });
 });
+
 
 
 var app = builder.Build();
