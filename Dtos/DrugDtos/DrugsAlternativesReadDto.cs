@@ -50,5 +50,6 @@ namespace SearchTool_ServerSide.Dtos.DrugDtos
         public string ApprovedStatus { get; set; }
         public string PriorAuthorizationStatus { get; set; }
         public string SubmitedUser { get; internal set; }
+        public string DrugAlternativeStatus { get; set; } = "NA";
     }
 }

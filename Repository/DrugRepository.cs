@@ -2741,15 +2741,16 @@ namespace SearchTool_ServerSide.Repository
             public string ApplicationType { get; set; } = "";
             public int Stock { get; set; }
             public string? BranchName { get; set; }
+            public string DrugAlternativeStatus { get; set; } = "NA";
         }
         public async Task<PagedResult<DrugsAlternativesReadDto>> GetAlternativesWithInsurance(
-            int classInfoId,
-            string sourceDrugNDC,
-            int pageNumber = 1,
-            int pageSize = 10,
-            string? rxgroup = null,
-            string? pcn = null,
-            string? bin = null)
+       int classInfoId,
+       string sourceDrugNDC,
+       int pageNumber = 1,
+       int pageSize = 10,
+       string? rxgroup = null,
+       string? pcn = null,
+       string? bin = null)
         {
             if (pageNumber < 1) pageNumber = 1;
             if (pageSize <= 0) pageSize = 10;
@@ -2830,15 +2831,28 @@ namespace SearchTool_ServerSide.Repository
                     on new { DrugNDC = br.D.NDC, BranchId = di.BranchId }
                     equals new { dbGroup.DrugNDC, dbGroup.BranchId } into dbGroup
                 from db in dbGroup.DefaultIfEmpty()
-                let latestReport =
-                    _context.Reports
-                        .Include(r => r.InsuranceStatus)
+                let latestDrugAlternativeReport =
+                    _context.DrugAlternativeReports
                         .Where(r => r.SourceDrugNDC == sourceDrugNDC
                                     && r.TargetDrugNDC == di.NDCCode
-                                    && r.InsuranceRxId == di.InsuranceId)
+                                    && r.ClassInfoId == br.Ci.Id)
                         .OrderByDescending(r => r.StatusDate)
                         .ThenByDescending(r => r.Id)
                         .FirstOrDefault()
+                let latestInsuranceStatus =
+                    di == null ? null :
+                    _context.Reports.Include(r => r.InsuranceStatus)
+
+                        .Where(r =>
+                            r.SourceDrugNDC == sourceDrugNDC &&
+                            r.TargetDrugNDC == di.NDCCode &&
+                            r.InsuranceRxId == di.InsuranceId)
+                        .OrderByDescending(r => r.StatusDate)
+                        .ThenByDescending(r => r.Id)
+                        .FirstOrDefault()
+                where di.Date == _context.DrugInsurances
+                                    .Where(x => x.NDCCode == di.NDCCode && x.InsuranceId == di.InsuranceId)
+                                    .Max(x => x.Date) // Get the newest date
                 select new
                 {
                     Drug = br.D,
@@ -2847,22 +2861,22 @@ namespace SearchTool_ServerSide.Repository
                     DrugInsurance = di,
                     InsuranceRx = ir,
                     DrugBranch = db,
-                    LatestReport = latestReport
+                    LatestDrugAlternativeReport = latestDrugAlternativeReport,
+                    LatestInsuranceStatus = latestInsuranceStatus
+
                 };
 
-            // Optional: case-insensitive filters (uncomment if needed)
-            // var rx = rxgroup?.ToLower(); var p = pcn?.ToLower(); var b = bin?.ToLower();
+            // filters
             if (!string.IsNullOrWhiteSpace(rxgroup))
-                query = query.Where(x => x.InsuranceRx.RxGroup == rxgroup /* || x.InsuranceRx.RxGroup.ToLower() == rx */);
+                query = query.Where(x => x.InsuranceRx.RxGroup == rxgroup);
             if (!string.IsNullOrWhiteSpace(pcn))
-                query = query.Where(x => x.InsuranceRx.InsurancePCN != null && x.InsuranceRx.InsurancePCN.PCN == pcn /* || x.InsuranceRx.InsurancePCN.PCN.ToLower() == p */);
+                query = query.Where(x => x.InsuranceRx.InsurancePCN != null && x.InsuranceRx.InsurancePCN.PCN == pcn);
             if (!string.IsNullOrWhiteSpace(bin))
                 query = query.Where(x => x.InsuranceRx.InsurancePCN != null
                                       && x.InsuranceRx.InsurancePCN.Insurance != null
-                                      && x.InsuranceRx.InsurancePCN.Insurance.Bin == bin /* || x.InsuranceRx.InsurancePCN.Insurance.Bin.ToLower() == b */);
+                                      && x.InsuranceRx.InsurancePCN.Insurance.Bin == bin);
 
             var projected = await query.AsNoTracking().ToListAsync();
-
             var branchDict = await _context.Branches.AsNoTracking().ToDictionaryAsync(b => b.Id);
 
             var grouped = projected
@@ -2870,11 +2884,10 @@ namespace SearchTool_ServerSide.Repository
                 .Select(g =>
                 {
                     var best = g.OrderByDescending(r => r.DrugInsurance.Net).First();
-
                     var di = best.DrugInsurance;
                     var ir = best.InsuranceRx;
-                    var latest = best.LatestReport;
-
+                    var latestDrugAlternativeReport = best.LatestDrugAlternativeReport;
+                    var latestInsuranceStatus = best.LatestInsuranceStatus;
                     var dto = _mapper.Map<DrugsAlternativesReadDto>(di);
                     dto.DrugName = best.Drug.Name;
                     dto.NDCCode = best.Drug.NDC;
@@ -2901,14 +2914,11 @@ namespace SearchTool_ServerSide.Repository
                     dto.binId = ir.InsurancePCN?.Insurance?.Id ?? 0;
                     dto.pcnId = ir.InsurancePCN?.Id ?? 0;
                     dto.rxgroupId = ir.Id;
-
-                    dto.Status = latest?.Status ?? "Not Available";
-                    dto.StatusDescription = latest?.StatusDescription ?? "No additional information";
-                    dto.AdditionalInfo = latest?.AdditionalInfo;
-                    dto.StatusDate = latest?.StatusDate;
-                    dto.SubmitedUser = latest?.UserEmail ?? "";
-                    dto.ApprovedStatus = latest?.InsuranceStatus?.ApprovedStatus ?? "NA";
-                    dto.PriorAuthorizationStatus = latest?.InsuranceStatus?.PriorAuthorizationStatus ?? "NA";
+                    dto.Status = latestInsuranceStatus?.Status ?? "Not Available";
+                    dto.PriorAuthorizationStatus = latestInsuranceStatus?.InsuranceStatus.PriorAuthorizationStatus ?? "NA";
+                    dto.ApprovedStatus = latestInsuranceStatus?.InsuranceStatus.ApprovedStatus ?? "NA";
+                    // NEW: Only DrugAlternativeStatus
+                    dto.DrugAlternativeStatus = latestDrugAlternativeReport?.Status ?? "NA";
 
                     if (branchDict.TryGetValue(di.BranchId, out var branch))
                         dto.branchName = branch.Name;
@@ -2916,7 +2926,7 @@ namespace SearchTool_ServerSide.Repository
                     if (dto.Quantity == 0) dto.Quantity = 1;
                     return dto;
                 })
-                .OrderByDescending(x => x.Net)   // <-- ensure matches DTO property name
+                .OrderByDescending(x => x.Net)
                 .ToList();
 
             var totalCount = grouped.Count;
@@ -3142,38 +3152,45 @@ namespace SearchTool_ServerSide.Repository
 
             // De-dup by NDC (since a drug could appear via multiple classes within same classType)
             var dedup = flat
-                .GroupBy(x => x.D.NDC)
-                .Select(g =>
-                {
-                    // choose the row with highest stock, then by name
-                    var best = g.OrderByDescending(r => r.DrugBranch != null ? r.DrugBranch.Stock : 0)
-                                .ThenBy(r => r.D.Name)
-                                .First();
+                        .GroupBy(x => x.D.NDC)
+                        .Select(g =>
+                        {
+                            var best = g.OrderByDescending(r => r.DrugBranch != null ? r.DrugBranch.Stock : 0)
+                                        .ThenBy(r => r.D.Name)
+                                        .First();
 
-                    return new DrugAlternativeLiteDto
-                    {
-                        DrugId = best.D.Id,
-                        DrugName = best.D.Name,
-                        NDCCode = best.D.NDC,
-                        DrugClassId = best.Dc.Id,
-                        DrugClass = best.Ci.Name,
-                        Form = best.D.Form,
-                        Strength = best.D.Strength,
-                        StrengthUnit = best.D.StrengthUnit,
-                        Route = best.D.Route,
-                        Type = best.D.Type,
-                        TECode = best.D.TECode,
-                        ApplicationNumber = best.D.ApplicationNumber,
-                        ApplicationType = best.D.ApplicationType,
-                        Stock = best.DrugBranch?.Stock ?? 0,
-                        BranchName = ""
-                    };
-                })
-                // default ordering for UX: by name asc, then by stock desc (tweak to your taste)
-                .OrderBy(x => x.DrugName)
-                .ThenByDescending(x => x.Stock)
-                .ToList();
+                            // Get latest report for this drug alternative
+                            var latestReport = _context.DrugAlternativeReports
+                                .Where(r => r.SourceDrugNDC == sourceDrugNDC
+                                            && r.TargetDrugNDC == best.D.NDC
+                                            && r.ClassInfoId == best.Ci.Id)
+                                .OrderByDescending(r => r.StatusDate)
+                                .ThenByDescending(r => r.Id)
+                                .FirstOrDefault();
 
+                            return new DrugAlternativeLiteDto
+                            {
+                                DrugId = best.D.Id,
+                                DrugName = best.D.Name,
+                                NDCCode = best.D.NDC,
+                                DrugClassId = best.Dc.Id,
+                                DrugClass = best.Ci.Name,
+                                Form = best.D.Form,
+                                Strength = best.D.Strength,
+                                StrengthUnit = best.D.StrengthUnit,
+                                Route = best.D.Route,
+                                Type = best.D.Type,
+                                TECode = best.D.TECode,
+                                ApplicationNumber = best.D.ApplicationNumber,
+                                ApplicationType = best.D.ApplicationType,
+                                Stock = best.DrugBranch?.Stock ?? 0,
+                                BranchName = "",
+                                DrugAlternativeStatus = latestReport?.Status ?? "NA"  // NEW
+                            };
+                        })
+                        .OrderBy(x => x.DrugName)
+                        .ThenByDescending(x => x.Stock)
+                        .ToList();
             var totalCount = dedup.Count;
             var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
             var skip = (pageNumber - 1) * pageSize;
@@ -3187,6 +3204,7 @@ namespace SearchTool_ServerSide.Repository
                 PageSize = pageSize
             };
         }
+
         internal async Task<Drug> GetDrugById(int id)
         {
             var item = await _context.Drugs.FirstOrDefaultAsync(x => x.Id == id);

@@ -64,6 +64,8 @@ builder.Services.AddScoped<OrderItemRepository>();
 builder.Services.AddScoped<SearchLogRepository>();
 builder.Services.AddScoped<NadacRepository>();
 builder.Services.AddScoped<MainCompanyRepository>();
+builder.Services.AddScoped<DrugClassRepository>();
+//////////////////////////////////////////////
 builder.Services.AddScoped<NadacService>();
 builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<DrugService>();
@@ -73,6 +75,7 @@ builder.Services.AddScoped<LogsService>();
 builder.Services.AddScoped<DataSyncService>();
 builder.Services.AddScoped<MainCompanyService>();
 builder.Services.AddScoped<FeedbackService>();
+builder.Services.AddScoped<DrugClassService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddControllers();

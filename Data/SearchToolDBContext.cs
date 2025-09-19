@@ -133,6 +133,8 @@ namespace SearchTool_ServerSide.Data
         public DbSet<QuestionEntry> Questions { get; set; }
         public DbSet<InsuranceStatus> InsuranceStatuses { get; set; }
         public DbSet<Report> Reports { get; set; }
+        public DbSet<DrugAlternativeStatus> DrugAlternativeStatuses { get; set; }
+        public DbSet<DrugAlternativeReport> DrugAlternativeReports { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -179,6 +181,49 @@ namespace SearchTool_ServerSide.Data
                  .HasPrincipalKey(u => u.Email)
                  .OnDelete(DeleteBehavior.SetNull);
          });
+            modelBuilder.Entity<DrugAlternativeStatus>(b =>
+            {
+                // NEW: composite PK
+                b.HasKey(i => new { i.SourceDrugNDC, i.TargetDrugNDC, i.ClassInfoId });
+
+                // keep your old relationships:
+                b.HasOne(i => i.SourceDrug)
+                    .WithMany()
+                    .HasForeignKey(i => i.SourceDrugNDC)
+                    .HasPrincipalKey(d => d.NDC)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                b.HasOne(i => i.TargetDrug)
+                    .WithMany()
+                    .HasForeignKey(i => i.TargetDrugNDC)
+                    .HasPrincipalKey(d => d.NDC)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                b.HasOne(i => i.ClassInfo)
+                    .WithMany()
+                    .HasForeignKey(i => i.ClassInfoId)
+                    // Consider Restrict/NoAction to avoid accidental cascades;
+                    // keep Cascade if you're sure it's desired.
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                // NEW: Reports relationship
+                b.HasMany(i => i.Reports)
+                    .WithOne(r => r.DrugAlternativeStatus)
+                    .HasForeignKey(r => new { r.SourceDrugNDC, r.TargetDrugNDC, r.ClassInfoId })
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+            modelBuilder.Entity<DrugAlternativeReport>(b =>
+            {
+                b.HasKey(r => r.Id);
+
+                b.HasIndex(r => new { r.ClassInfoId, r.SourceDrugNDC, r.TargetDrugNDC, r.StatusDate });
+
+                b.HasOne(r => r.User)
+                    .WithMany()
+                    .HasForeignKey(r => r.UserEmail)
+                    .HasPrincipalKey(u => u.Email)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
             modelBuilder.Entity<SearchDrugDetailsLogs>(entity =>
             {
                 entity.HasKey(e => new { e.UserEmail, e.NDC });

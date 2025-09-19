@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SearchTool_ServerSide.Data;
@@ -11,9 +12,11 @@ using SearchTool_ServerSide.Data;
 namespace SearchTool_ServerSide.Migrations
 {
     [DbContext(typeof(SearchToolDBContext))]
-    partial class SearchToolDBContextModelSnapshot : ModelSnapshot
+    [Migration("20250917195512_drugAlternativeReport")]
+    partial class drugAlternativeReport
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -364,13 +367,14 @@ namespace SearchTool_ServerSide.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("UserEmail");
+                    b.HasIndex("UserId");
 
                     b.HasIndex("SourceDrugNDC", "TargetDrugNDC", "ClassInfoId");
-
-                    b.HasIndex("ClassInfoId", "SourceDrugNDC", "TargetDrugNDC", "StatusDate");
 
                     b.ToTable("DrugAlternativeReports");
                 });
@@ -1227,9 +1231,8 @@ namespace SearchTool_ServerSide.Migrations
                 {
                     b.HasOne("SearchTool_ServerSide.Models.User", "User")
                         .WithMany()
-                        .HasForeignKey("UserEmail")
-                        .HasPrincipalKey("Email")
-                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("SearchTool_ServerSide.Models.DrugAlternativeStatus", "DrugAlternativeStatus")

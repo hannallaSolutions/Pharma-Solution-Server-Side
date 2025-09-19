@@ -171,12 +171,13 @@ namespace SearchTool_ServerSide.Repository
 
             await _context.SaveChangesAsync(ct);
         }
+
         internal async Task<IEnumerable<Report>> GetReportsAsyncByKey(string sourceDrugNDC, string TargetDrugNDC, int insuranceRxId, CancellationToken ct = default, int pageSize = 3)
         {
             return await _context.Reports
                 .Where(r => r.SourceDrugNDC == sourceDrugNDC && r.TargetDrugNDC == TargetDrugNDC && r.InsuranceRxId == insuranceRxId)
                 .OrderByDescending(r => r.StatusDate)
-                .Skip(1)
+                .Skip(0)
                 .Take(pageSize)
                 .ToListAsync(ct);
         }
