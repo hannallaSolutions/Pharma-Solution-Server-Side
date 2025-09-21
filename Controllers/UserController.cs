@@ -34,10 +34,10 @@ namespace SearchTool_ServerSide.Controllers
             var user = await _userService.GetUserById(int.Parse(tokens.Value.userId));
             var cookieOptions = new CookieOptions
             {
-                HttpOnly = true, // Prevent access from JavaScript
-                Secure = true, // Use only on HTTPS
-                SameSite = SameSiteMode.Strict, // Prevent CSRF
-                Expires = DateTime.UtcNow.AddDays(1) // Expiration time
+                HttpOnly = true,
+                Secure = true, // required for SameSite=None
+                SameSite = SameSiteMode.None, // allow cross-site cookie
+                Expires = DateTime.UtcNow.AddDays(1)
             };
             Response.Cookies.Append("refreshToken", tokens.Value.refreshToken, cookieOptions);
 
@@ -90,7 +90,7 @@ namespace SearchTool_ServerSide.Controllers
             });
         }
 
-        [HttpGet("UserById"), Authorize(Policy = "Pharmacist"),Authorize]
+        [HttpGet("UserById"), Authorize(Policy = "Pharmacist"), Authorize]
         public async Task<IActionResult> GetUserById()
         {
             var userData = userAccessToken.tokenData();
@@ -149,14 +149,14 @@ namespace SearchTool_ServerSide.Controllers
             var users = await _userService.GetAllUser();
             return Ok(users);
         }
-        [HttpGet("allCrid"),AllowAnonymous]
+        [HttpGet("allCrid"), AllowAnonymous]
         public async Task<IActionResult> GetAllUserCrid()
         {
             var users = await _userService.GetAllUserCrid();
             return Ok(users);
         }
         [HttpPost("InsertUserData"), AllowAnonymous]
-        public async Task<IActionResult> InsertUserData([FromBody]IEnumerable<AllUserAddDto> Items)
+        public async Task<IActionResult> InsertUserData([FromBody] IEnumerable<AllUserAddDto> Items)
         {
             await _userService.AddAllUserData(Items);
             return Ok("Users Added successfully to DataBase :)");
@@ -164,7 +164,7 @@ namespace SearchTool_ServerSide.Controllers
         [HttpGet("Logout")]
         public IActionResult LogOut()
         {
-            
+
             return Ok("LogOut Success");
         }
 
