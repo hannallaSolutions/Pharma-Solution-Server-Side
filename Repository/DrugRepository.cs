@@ -3053,10 +3053,10 @@ namespace SearchTool_ServerSide.Repository
 
 
         public async Task<PagedResult<DrugAlternativeLiteDto>> GetAlternativesNoInsurancePaged(
-            int classInfoId,
-            string sourceDrugNDC,
-            int pageNumber = 1,
-            int pageSize = 10)
+    int classInfoId,
+    string sourceDrugNDC,
+    int pageNumber = 1,
+    int pageSize = 10)
         {
             if (pageNumber < 1) pageNumber = 1;
             if (pageSize <= 0) pageSize = 10;
@@ -3118,9 +3118,12 @@ namespace SearchTool_ServerSide.Repository
                     from dc in _context.DrugClasses
                     join d in _context.Drugs on dc.DrugId equals d.Id
                     join ci in _context.ClassInfos on dc.ClassId equals ci.Id
+                    join di in _context.DrugInsurances on dc.DrugId equals di.DrugId into diGroup
+                    from di in diGroup.DefaultIfEmpty()
                     where sourceClassIds.Contains(dc.ClassId)
                           && ci.ClassTypeId == classInfo.ClassTypeId
                           && d.NDC != sourceDrugNDC
+                          && di == null                 // ✅ only drugs with no insurance
                     select new BaseRow { Dc = dc, D = d, Ci = ci };
             }
             else
@@ -3129,12 +3132,15 @@ namespace SearchTool_ServerSide.Repository
                     from dc in _context.DrugClasses
                     join d in _context.Drugs on dc.DrugId equals d.Id
                     join ci in _context.ClassInfos on dc.ClassId equals ci.Id
+                    join di in _context.DrugInsurances on dc.DrugId equals di.DrugId into diGroup
+                    from di in diGroup.DefaultIfEmpty()
                     where dc.ClassId == classInfoId
                           && d.NDC != sourceDrugNDC
+                          && di == null                 // ✅ only drugs with no insurance
                     select new BaseRow { Dc = dc, D = d, Ci = ci };
             }
 
-            // Optional branch info (default branch = 1 if you follow that convention)
+            // Optional branch info (default branch = 1)
             var flat = await (
                 from br in baseSet
                 join dbGroup in _context.DrugBranches
@@ -3150,47 +3156,47 @@ namespace SearchTool_ServerSide.Repository
                 }
             ).AsNoTracking().ToListAsync();
 
-            // De-dup by NDC (since a drug could appear via multiple classes within same classType)
+            // Deduplicate by NDC
             var dedup = flat
-                        .GroupBy(x => x.D.NDC)
-                        .Select(g =>
-                        {
-                            var best = g.OrderByDescending(r => r.DrugBranch != null ? r.DrugBranch.Stock : 0)
-                                        .ThenBy(r => r.D.Name)
-                                        .First();
+                .GroupBy(x => x.D.NDC)
+                .Select(g =>
+                {
+                    var best = g.OrderByDescending(r => r.DrugBranch != null ? r.DrugBranch.Stock : 0)
+                                .ThenBy(r => r.D.Name)
+                                .First();
 
-                            // Get latest report for this drug alternative
-                            var latestReport = _context.DrugAlternativeReports
-                                .Where(r => r.SourceDrugNDC == sourceDrugNDC
-                                            && r.TargetDrugNDC == best.D.NDC
-                                            && r.ClassInfoId == best.Ci.Id)
-                                .OrderByDescending(r => r.StatusDate)
-                                .ThenByDescending(r => r.Id)
-                                .FirstOrDefault();
+                    var latestReport = _context.DrugAlternativeReports
+                        .Where(r => r.SourceDrugNDC == sourceDrugNDC
+                                    && r.TargetDrugNDC == best.D.NDC
+                                    && r.ClassInfoId == best.Ci.Id)
+                        .OrderByDescending(r => r.StatusDate)
+                        .ThenByDescending(r => r.Id)
+                        .FirstOrDefault();
 
-                            return new DrugAlternativeLiteDto
-                            {
-                                DrugId = best.D.Id,
-                                DrugName = best.D.Name,
-                                NDCCode = best.D.NDC,
-                                DrugClassId = best.Dc.Id,
-                                DrugClass = best.Ci.Name,
-                                Form = best.D.Form,
-                                Strength = best.D.Strength,
-                                StrengthUnit = best.D.StrengthUnit,
-                                Route = best.D.Route,
-                                Type = best.D.Type,
-                                TECode = best.D.TECode,
-                                ApplicationNumber = best.D.ApplicationNumber,
-                                ApplicationType = best.D.ApplicationType,
-                                Stock = best.DrugBranch?.Stock ?? 0,
-                                BranchName = "",
-                                DrugAlternativeStatus = latestReport?.Status ?? "NA"  // NEW
-                            };
-                        })
-                        .OrderBy(x => x.DrugName)
-                        .ThenByDescending(x => x.Stock)
-                        .ToList();
+                    return new DrugAlternativeLiteDto
+                    {
+                        DrugId = best.D.Id,
+                        DrugName = best.D.Name,
+                        NDCCode = best.D.NDC,
+                        DrugClassId = best.Dc.Id,
+                        DrugClass = best.Ci.Name,
+                        Form = best.D.Form,
+                        Strength = best.D.Strength,
+                        StrengthUnit = best.D.StrengthUnit,
+                        Route = best.D.Route,
+                        Type = best.D.Type,
+                        TECode = best.D.TECode,
+                        ApplicationNumber = best.D.ApplicationNumber,
+                        ApplicationType = best.D.ApplicationType,
+                        Stock = best.DrugBranch?.Stock ?? 0,
+                        BranchName = "",
+                        DrugAlternativeStatus = latestReport?.Status ?? "NA"
+                    };
+                })
+                .OrderBy(x => x.DrugName)
+                .ThenByDescending(x => x.Stock)
+                .ToList();
+
             var totalCount = dedup.Count;
             var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
             var skip = (pageNumber - 1) * pageSize;
