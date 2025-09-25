@@ -2363,7 +2363,7 @@ namespace SearchTool_ServerSide.Repository
                         };
 
             var result = await query.FirstOrDefaultAsync();
-
+            var insuranceStatus = await _context.InsuranceStatuses.Include(x=>x.Reports).FirstOrDefaultAsync(x=>x.SourceDrugNDC==ndc && x.InsuranceRxId == insuranceId && x.TargetDrugNDC == ndc);
             if (result == null)
                 return null;
 
@@ -2376,6 +2376,9 @@ namespace SearchTool_ServerSide.Repository
             dto.rxgroupId = result.rxgroupId;
             dto.binId = result.binId;
             dto.Quantity = result.DrugInsurance.Quantity;
+            dto.PriorAuthorizationStatus = insuranceStatus?.PriorAuthorizationStatus?? "NA";
+            dto.ApprovedStatus = insuranceStatus?.ApprovedStatus?? "NA";
+            dto.Status = insuranceStatus?.Reports.OrderByDescending(x => x.StatusDate).FirstOrDefault()?.Status ?? "Not Available";
             if (dto.Quantity == 0)
             {
                 dto.Quantity = 1;
@@ -3555,7 +3558,7 @@ namespace SearchTool_ServerSide.Repository
                     dto.HighestDrugId = bestAlt.DrugId;
                     dto.HighestDrugName = bestAlt.Drug?.Name ?? "";
                     dto.HighestDrugNDC = bestAlt.Drug?.NDC ?? "";
-                    dto.HighestNet = bestAlt.BestNet * si.Quantity;
+                    dto.HighestNet = bestAlt.BestNet * bestAlt.Qty;
                     dto.HighestScriptCode = bestAlt.ScriptCode;
                     dto.HighestScriptDate = bestAlt.ScriptDateTime;
                     dto.HighestNetProfitPerItem = bestAlt.BestNet;
