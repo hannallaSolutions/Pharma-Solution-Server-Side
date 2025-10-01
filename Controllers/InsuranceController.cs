@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SearchTool_ServerSide.Authentication;
+using SearchTool_ServerSide.Dtos.InsuranceDtos.cs;
 using SearchTool_ServerSide.Models;
 using SearchTool_ServerSide.Services;
 
@@ -71,11 +72,30 @@ namespace SearchTool_ServerSide.Controllers
             await _insuranceService.ReportStatus(request, user.Email);
             return Ok("Report submitted successfully.");
         }
-        [HttpGet("GetReportsAsyncByKey"),AllowAnonymous]
+        [HttpGet("GetReportsAsyncByKey"), AllowAnonymous]
         public async Task<IActionResult> GetReportsAsyncByKey([FromQuery] string sourceDrugNDC, [FromQuery] string targetDrugNDC, [FromQuery] int insuranceRxId)
         {
             var items = await _insuranceService.GetReportsAsyncByKey(sourceDrugNDC, targetDrugNDC, insuranceRxId);
             return Ok(items);
+        }
+        [HttpGet("GetReportsAsyncByTargetNDC"), AllowAnonymous]
+        public async Task<IActionResult> GetReportsAsyncByTargetNDC([FromQuery] string targetDrugNDC, [FromQuery] int insuranceRxId)
+        {
+            var items = await _insuranceService.GetReportsAsyncByTargetNDC(targetDrugNDC, insuranceRxId);
+            return Ok(items);
+        }
+        [HttpPost("CheckInsuranceAvailability")]
+        public async Task<IActionResult> CheckInsuranceAvailability([FromBody] CustomAddDrugInsuranceRequest request)
+        {
+            var isAvailable = await _insuranceService.CheckInsuranceAvailability(request);
+            return Ok(isAvailable);
+        }
+        [HttpPost("HandleCustomAddDrugInsurance")]
+        public async Task<IActionResult> HandleCustomAddDrugInsurance([FromBody] CustomAddDrugInsuranceRequest request)
+        {
+            var user = userAccessToken.tokenData();
+            await _insuranceService.HandleCustomAddDrugInsurance(request, branchId: int.Parse(user.BranchId, null), userEmail: user.Email);
+            return Ok("Insurance information processed successfully.");
         }
     }
 

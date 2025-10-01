@@ -181,5 +181,110 @@ namespace SearchTool_ServerSide.Repository
                 .Take(pageSize)
                 .ToListAsync(ct);
         }
+        internal async Task<IEnumerable<Report>> GetReportsAsyncByTargetNDC(string targetDrugNDC, int insuranceRxId, CancellationToken ct = default, int pageSize = 3)
+        {
+            return await _context.Reports
+                .Where(r => r.TargetDrugNDC == targetDrugNDC && r.InsuranceRxId == insuranceRxId)
+                .OrderByDescending(r => r.StatusDate)
+                .Skip(0)
+                .Take(pageSize)
+                .ToListAsync(ct);
+        }
+        internal async Task<bool> CheckInsuranceAvailability(CustomAddDrugInsuranceRequest request)
+        {
+            var insuranceBIN = await _context.Insurances.FirstOrDefaultAsync(x => x.Name == request.InsuranceBin);
+            if (request.InsuranceBin != null && insuranceBIN == null)
+            {
+                return true;
+            }
+            var insurancePCN = await _context.InsurancePCNs.FirstOrDefaultAsync(x => x.PCN == request.InsurancePCN && x.InsuranceId == insuranceBIN.Id);
+            if (request.InsurancePCN != null && insurancePCN == null)
+            {
+                return true;
+            }
+            var insuranceRX = await _context.InsuranceRxes.FirstOrDefaultAsync(x => x.RxGroup == request.InsuranceRx && x.InsurancePCNId == insurancePCN.Id);
+            if (request.InsuranceRx != null && insuranceRX == null)
+            {
+                return true;
+            }
+            var drugInsurance = await _context.DrugInsurances.FirstOrDefaultAsync(x => x.DrugId == request.DrugId && x.InsuranceId == insuranceRX.Id);
+            if (drugInsurance == null)
+            {
+                return true;
+            }
+            return false;
+        }
+        internal async Task HandleCustomAddDrugInsurance(CustomAddDrugInsuranceRequest request, CancellationToken ct = default, int branchId = 1, string userEmail = "")
+        {
+            var insuranceBIN = await _context.Insurances.FirstOrDefaultAsync(x => x.Name == request.InsuranceBin, ct);
+            if (request.InsuranceBin != null && insuranceBIN == null)
+            {
+                insuranceBIN = new Insurance
+                {
+                    Name = request.InsuranceBin,
+                    Bin = request.InsuranceBinCode ?? request.InsuranceBin,
+                    HelpDeskNumber = "NA"
+
+                };
+                _context.Insurances.Add(insuranceBIN);
+                await _context.SaveChangesAsync(ct);
+            }
+            var insurancePCN = await _context.InsurancePCNs.FirstOrDefaultAsync(x => x.PCN == request.InsurancePCN && x.InsuranceId == insuranceBIN.Id, ct);
+            if (request.InsurancePCN != null && insurancePCN == null)
+            {
+                insurancePCN = new InsurancePCN
+                {
+                    PCN = request.InsurancePCN,
+                    InsuranceId = insuranceBIN.Id
+
+                };
+                _context.InsurancePCNs.Add(insurancePCN);
+                await _context.SaveChangesAsync(ct);
+            }
+            var insuranceRX = await _context.InsuranceRxes.FirstOrDefaultAsync(x => x.RxGroup == request.InsuranceRx && x.InsurancePCNId == insurancePCN.Id, ct);
+            if (request.InsuranceRx != null && insuranceRX == null)
+            {
+                insuranceRX = new InsuranceRx
+                {
+                    RxGroup = request.InsuranceRx,
+                    InsurancePCNId = insurancePCN.Id
+
+                };
+                _context.InsuranceRxes.Add(insuranceRX);
+                await _context.SaveChangesAsync(ct);
+            }
+            var drug = await _context.Drugs.FirstOrDefaultAsync(x => x.Id == request.DrugId, ct);
+            var drugInsurance = await _context.DrugInsurances.FirstOrDefaultAsync(x => x.DrugId == request.DrugId && x.InsuranceId == insuranceRX.Id, ct);
+            if (drugInsurance == null)
+            {
+                drugInsurance = new DrugInsurance
+                {
+                    DrugId = request.DrugId,
+                    InsuranceId = insuranceRX.Id,
+                    Date = DateTime.UtcNow,
+                    NDCCode = drug.NDC,
+                    BranchId = branchId,
+                    Quantity = 1,
+                    AcquisitionCost = 0,
+                    PatientPayment = 0,
+                    InsurancePayment = 0,
+                    Net = 0,
+                    Prescriber = "NA",
+
+                };
+                _context.DrugInsurances.Add(drugInsurance);
+                await _context.SaveChangesAsync(ct);
+                var log = new Log
+                {
+                    Action = $"Processing custom insurance addition for DrugId: {request.DrugId}, InsuranceRx: {request.InsuranceRx}, InsurancePCN: {request.InsurancePCN}, InsuranceBin: {request.InsuranceBin} at branch {branchId}",
+                    Date = DateTime.UtcNow,
+                    UserEmail = userEmail
+                };
+                _context.Logs.Add(log);
+                await _context.SaveChangesAsync(ct);
+            }
+        }
+
+
     }
 }

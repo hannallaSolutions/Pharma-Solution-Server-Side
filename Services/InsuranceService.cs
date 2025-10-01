@@ -64,5 +64,17 @@ namespace SearchTool_ServerSide.Services
         {
             return await _insuranceRepository.GetReportsAsyncByKey(sourceDrugNDC, targetDrugNDC, insuranceRxId);
         }
+        internal async Task<IEnumerable<Report>> GetReportsAsyncByTargetNDC(string targetDrugNDC, int insuranceRxId)
+        {
+            return await _insuranceRepository.GetReportsAsyncByTargetNDC(targetDrugNDC, insuranceRxId);
+        }
+        internal async Task<bool> CheckInsuranceAvailability(CustomAddDrugInsuranceRequest request)
+        {
+            return await _insuranceRepository.CheckInsuranceAvailability(request);
+        }
+        internal async Task HandleCustomAddDrugInsurance(CustomAddDrugInsuranceRequest request, CancellationToken ct = default, int branchId = 1,string userEmail = "")
+        {
+            await _insuranceRepository.HandleCustomAddDrugInsurance(request, ct, branchId, userEmail);
+        }
     }
 }
