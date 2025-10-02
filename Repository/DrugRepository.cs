@@ -2336,95 +2336,95 @@ namespace SearchTool_ServerSide.Repository
             return item;
         }
 
-    internal async Task<DrugsAlternativesReadDto> GetDetails(string ndc, int insuranceId)
-{
-    // 1) Pull the latest DrugInsurance row for this (ndc, insuranceId)
-    var query =
-        from di in _context.DrugInsurances
-        join d in _context.Drugs on ndc equals d.NDC
-        join irx in _context.InsuranceRxes on di.InsuranceId equals irx.Id
-        join ipcn in _context.InsurancePCNs on irx.InsurancePCNId equals ipcn.Id
-        join ins in _context.Insurances on ipcn.InsuranceId equals ins.Id
-        where di.NDCCode == ndc
-           && di.InsuranceId == insuranceId
-           && di.Date == _context.DrugInsurances
-                               .Where(x => x.NDCCode == ndc && x.InsuranceId == insuranceId)
-                               .Max(x => x.Date) // newest DI row
-        select new
+        internal async Task<DrugsAlternativesReadDto> GetDetails(string ndc, int insuranceId)
         {
-            DrugInsurance = di,
-            Bin = ins.Bin,
-            BinFullName = ins.Name,
-            RxGroup = irx.RxGroup,
-            PCN = ipcn.PCN,
-            pcnId = ipcn.Id,
-            rxgroupId = irx.Id,
-            binId = ins.Id,
-            drug = d
-        };
+            // 1) Pull the latest DrugInsurance row for this (ndc, insuranceId)
+            var query =
+                from di in _context.DrugInsurances
+                join d in _context.Drugs on ndc equals d.NDC
+                join irx in _context.InsuranceRxes on di.InsuranceId equals irx.Id
+                join ipcn in _context.InsurancePCNs on irx.InsurancePCNId equals ipcn.Id
+                join ins in _context.Insurances on ipcn.InsuranceId equals ins.Id
+                where di.NDCCode == ndc
+                   && di.InsuranceId == insuranceId
+                   && di.Date == _context.DrugInsurances
+                                       .Where(x => x.NDCCode == ndc && x.InsuranceId == insuranceId)
+                                       .Max(x => x.Date) // newest DI row
+                select new
+                {
+                    DrugInsurance = di,
+                    Bin = ins.Bin,
+                    BinFullName = ins.Name,
+                    RxGroup = irx.RxGroup,
+                    PCN = ipcn.PCN,
+                    pcnId = ipcn.Id,
+                    rxgroupId = irx.Id,
+                    binId = ins.Id,
+                    drug = d
+                };
 
-    var result = await query.AsNoTracking().FirstOrDefaultAsync();
-    if (result == null) return null;
+            var result = await query.AsNoTracking().FirstOrDefaultAsync();
+            if (result == null) return null;
 
-    // 2) Get ALL matching InsuranceStatus rows (for this InsuranceRx + target NDC), with their Reports
-    var statuses = await _context.InsuranceStatuses
-        .Where(s => s.InsuranceRxId == insuranceId && s.TargetDrugNDC == ndc)
-        .Include(s => s.Reports)
-        .AsNoTracking()
-        .ToListAsync();
+            // 2) Get ALL matching InsuranceStatus rows (for this InsuranceRx + target NDC), with their Reports
+            var statuses = await _context.InsuranceStatuses
+                .Where(s => s.InsuranceRxId == insuranceId && s.TargetDrugNDC == ndc)
+                .Include(s => s.Reports)
+                .AsNoTracking()
+                .ToListAsync();
 
-    // Helper: latest report date for a status (DateTime.MinValue if none)
-    DateTime LatestReportDate(InsuranceStatus s) =>
-        s.Reports?.OrderByDescending(r => r.StatusDate)
-                  .Select(r => r.StatusDate)
-                  .FirstOrDefault() ?? DateTime.MinValue;
+            // Helper: latest report date for a status (DateTime.MinValue if none)
+            DateTime LatestReportDate(InsuranceStatus s) =>
+                s.Reports?.OrderByDescending(r => r.StatusDate)
+                          .Select(r => r.StatusDate)
+                          .FirstOrDefault() ?? DateTime.MinValue;
 
-    // 3) Most recent row that has a PA value
-    var latestPAStatusRow = statuses
-        .Where(s => !string.IsNullOrWhiteSpace(s.PriorAuthorizationStatus) && s.PriorAuthorizationStatus != "NA")
-        .Select(s => new { Row = s, Latest = LatestReportDate(s) })
-        .OrderByDescending(x => x.Latest)
-        .Select(x => x.Row)
-        .FirstOrDefault();
+            // 3) Most recent row that has a PA value
+            var latestPAStatusRow = statuses
+                .Where(s => !string.IsNullOrWhiteSpace(s.PriorAuthorizationStatus) && s.PriorAuthorizationStatus != "NA")
+                .Select(s => new { Row = s, Latest = LatestReportDate(s) })
+                .OrderByDescending(x => x.Latest)
+                .Select(x => x.Row)
+                .FirstOrDefault();
 
-    // 4) Most recent row that has an Approved value
-    var latestApprovedStatusRow = statuses
-        .Where(s => !string.IsNullOrWhiteSpace(s.ApprovedStatus) && s.ApprovedStatus != "NA")
-        .Select(s => new { Row = s, Latest = LatestReportDate(s) })
-        .OrderByDescending(x => x.Latest)
-        .Select(x => x.Row)
-        .FirstOrDefault();
+            // 4) Most recent row that has an Approved value
+            var latestApprovedStatusRow = statuses
+                .Where(s => !string.IsNullOrWhiteSpace(s.ApprovedStatus) && s.ApprovedStatus != "NA")
+                .Select(s => new { Row = s, Latest = LatestReportDate(s) })
+                .OrderByDescending(x => x.Latest)
+                .Select(x => x.Row)
+                .FirstOrDefault();
 
-    // 5) The single most recent report across ALL rows for the top-level Status
-    var latestReport = statuses
-        .SelectMany(s => s.Reports ?? Enumerable.Empty<Report>())
-        .OrderByDescending(r => r.StatusDate)
-        .FirstOrDefault();
+            // 5) The single most recent report across ALL rows for the top-level Status
+            var latestReport = statuses
+                .SelectMany(s => s.Reports ?? Enumerable.Empty<Report>())
+                .OrderByDescending(r => r.StatusDate)
+                .FirstOrDefault();
 
-    // 6) Build DTO
-    var dto = _mapper.Map<DrugsAlternativesReadDto>(result.DrugInsurance);
-    dto.bin = result.Bin;
-    dto.BinFullName = result.BinFullName;
-    dto.rxgroup = result.RxGroup;
-    dto.pcn = result.PCN;
-    dto.pcnId = result.pcnId;
-    dto.rxgroupId = result.rxgroupId;
-    dto.binId = result.binId;
+            // 6) Build DTO
+            var dto = _mapper.Map<DrugsAlternativesReadDto>(result.DrugInsurance);
+            dto.bin = result.Bin;
+            dto.BinFullName = result.BinFullName;
+            dto.rxgroup = result.RxGroup;
+            dto.pcn = result.PCN;
+            dto.pcnId = result.pcnId;
+            dto.rxgroupId = result.rxgroupId;
+            dto.binId = result.binId;
 
-    // Ensure sensible quantity default
-    dto.Quantity = result.DrugInsurance.Quantity == 0 ? 1 : result.DrugInsurance.Quantity;
+            // Ensure sensible quantity default
+            dto.Quantity = result.DrugInsurance.Quantity == 0 ? 1 : result.DrugInsurance.Quantity;
 
-    dto.DrugName = result.drug.Name;
+            dto.DrugName = result.drug.Name;
 
-    // Fill PA and Approved independently based on their OWN most-recent rows
-    dto.PriorAuthorizationStatus = latestPAStatusRow?.PriorAuthorizationStatus ?? "NA";
-    dto.ApprovedStatus          = latestApprovedStatusRow?.ApprovedStatus      ?? "NA";
+            // Fill PA and Approved independently based on their OWN most-recent rows
+            dto.PriorAuthorizationStatus = latestPAStatusRow?.PriorAuthorizationStatus ?? "NA";
+            dto.ApprovedStatus = latestApprovedStatusRow?.ApprovedStatus ?? "NA";
 
-    // Top-line "Status" stays the most recent Report.Status overall
-    dto.Status = latestReport?.Status ?? "Not Available";
+            // Top-line "Status" stays the most recent Report.Status overall
+            dto.Status = latestReport?.Status ?? "Not Available";
 
-    return dto;
-}
+            return dto;
+        }
 
         internal async Task<DrugClass> getClassbyId(int id)
         {
@@ -2785,14 +2785,15 @@ namespace SearchTool_ServerSide.Repository
             public string? BranchName { get; set; }
             public string DrugAlternativeStatus { get; set; } = "NA";
         }
+
         public async Task<PagedResult<DrugsAlternativesReadDto>> GetAlternativesWithInsurance(
-      int classInfoId,
-      string sourceDrugNDC,
-      int pageNumber = 1,
-      int pageSize = 10,
-      string? rxgroup = null,
-      string? pcn = null,
-      string? bin = null)
+            int classInfoId,
+            string sourceDrugNDC,
+            int pageNumber = 1,
+            int pageSize = 10,
+            string? rxgroup = null,
+            string? pcn = null,
+            string? bin = null)
         {
             if (pageNumber < 1) pageNumber = 1;
             if (pageSize <= 0) pageSize = 10;
@@ -2800,30 +2801,13 @@ namespace SearchTool_ServerSide.Repository
 
             var classInfo = await _context.ClassInfos.AsNoTracking()
                 .FirstOrDefaultAsync(ci => ci.Id == classInfoId);
-            if (classInfo == null)
-                return new PagedResult<DrugsAlternativesReadDto>
-                {
-                    Items = Array.Empty<DrugsAlternativesReadDto>(),
-                    TotalCount = 0,
-                    TotalPages = 0,
-                    PageNumber = pageNumber,
-                    PageSize = pageSize
-                };
+            if (classInfo == null) return EmptyPage(pageNumber, pageSize);
 
             var sourceDrug = await _context.Drugs.AsNoTracking()
                 .FirstOrDefaultAsync(d => d.NDC == sourceDrugNDC);
-            if (sourceDrug == null)
-                return new PagedResult<DrugsAlternativesReadDto>
-                {
-                    Items = Array.Empty<DrugsAlternativesReadDto>(),
-                    TotalCount = 0,
-                    TotalPages = 0,
-                    PageNumber = pageNumber,
-                    PageSize = pageSize
-                };
+            if (sourceDrug == null) return EmptyPage(pageNumber, pageSize);
 
             IQueryable<BaseRow> baseSet;
-
             if (classInfo.ClassTypeId >= 7)
             {
                 var sourceClassIds = await (
@@ -2833,15 +2817,7 @@ namespace SearchTool_ServerSide.Repository
                     select dc.ClassId
                 ).Distinct().ToListAsync();
 
-                if (sourceClassIds.Count == 0)
-                    return new PagedResult<DrugsAlternativesReadDto>
-                    {
-                        Items = Array.Empty<DrugsAlternativesReadDto>(),
-                        TotalCount = 0,
-                        TotalPages = 0,
-                        PageNumber = pageNumber,
-                        PageSize = pageSize
-                    };
+                if (sourceClassIds.Count == 0) return EmptyPage(pageNumber, pageSize);
 
                 baseSet =
                     from dc in _context.DrugClasses
@@ -2862,9 +2838,13 @@ namespace SearchTool_ServerSide.Repository
                     select new BaseRow { Dc = dc, D = d, Ci = ci };
             }
 
+            // pre-filter DrugInsurances in SQL to only rows that have ScriptCode
+            var diWithScript = _context.DrugInsurances.AsNoTracking()
+                .Where(di => di.ScriptCode != null && di.ScriptCode != "");
+
             var query =
                 from br in baseSet
-                join di in _context.DrugInsurances on br.Dc.DrugId equals di.DrugId
+                join di in diWithScript on br.Dc.DrugId equals di.DrugId
                 join ir in _context.InsuranceRxes
                     .Include(x => x.InsurancePCN)
                     .ThenInclude(x => x.Insurance)
@@ -2882,7 +2862,6 @@ namespace SearchTool_ServerSide.Repository
                         .ThenByDescending(r => r.Id)
                         .FirstOrDefault()
                 let latestInsuranceStatus =
-                    di == null ? null :
                     _context.Reports.Include(r => r.InsuranceStatus)
                         .Where(r =>
                             r.SourceDrugNDC == sourceDrugNDC &&
@@ -2891,9 +2870,10 @@ namespace SearchTool_ServerSide.Repository
                         .OrderByDescending(r => r.StatusDate)
                         .ThenByDescending(r => r.Id)
                         .FirstOrDefault()
+                // newest per (NDC, InsuranceId)
                 where di.Date == _context.DrugInsurances
                                     .Where(x => x.NDCCode == di.NDCCode && x.InsuranceId == di.InsuranceId)
-                                    .Max(x => x.Date) // newest per (NDC, InsuranceId)
+                                    .Max(x => x.Date)
                 select new
                 {
                     Drug = br.D,
@@ -2916,78 +2896,100 @@ namespace SearchTool_ServerSide.Repository
                                       && x.InsuranceRx.InsurancePCN.Insurance != null
                                       && x.InsuranceRx.InsurancePCN.Insurance.Bin == bin);
 
-            var projected = await query.AsNoTracking().ToListAsync();
+            decimal PerItem(dynamic r)
+                => r.DrugInsurance.Quantity > 0 ? r.DrugInsurance.Net / r.DrugInsurance.Quantity : r.DrugInsurance.Net;
+
+            var projected = await query.ToListAsync(); // inputs already AsNoTracking
             var branchDict = await _context.Branches.AsNoTracking().ToDictionaryAsync(b => b.Id);
 
             List<DrugsAlternativesReadDto> grouped;
 
             if (!string.IsNullOrWhiteSpace(rxgroup))
             {
-                // Case A: rxgroup filter -> return all rows (no dedup / priority)
+                // rxgroup filter → all rows (no per-NDC dedupe)
                 grouped = projected
-                    .OrderByDescending(r => r.DrugInsurance.Net)
+                    .OrderBy(r => r.Drug.NDC) // arrange by NDC
+                    .ThenByDescending(r => r.DrugInsurance.Date)
+                    .ThenByDescending(r => r.DrugInsurance.Id)
                     .Select(r => MapDto(r, branchDict))
                     .ToList();
             }
             else if (!string.IsNullOrWhiteSpace(bin))
             {
-                // Case B: bin filter (no rxgroup) -> most recent per NDC, fallback if no bin row for that NDC
+                // BIN ONLY → per NDC pick two (no dedupe), then arrange by NDC
                 grouped = projected
                     .GroupBy(x => x.DrugInsurance.NDCCode)
-                    .Select(g =>
+                    .OrderBy(g => g.Key) // arrange groups by NDC
+                    .SelectMany(g =>
                     {
-                        var ndcRows = g
-                            .OrderByDescending(r => r.DrugInsurance.Date)
-                            .ThenByDescending(r => r.DrugInsurance.Net)
-                            .ToList();
+                        var outRows = new List<DrugsAlternativesReadDto>();
 
-                        // try bin match first
-                        var binRow = ndcRows.FirstOrDefault(r => r.InsuranceRx.InsurancePCN?.Insurance?.Bin == bin);
-                        var chosen = binRow ?? ndcRows.First(); // fallback most recent overall for that NDC
-                        return MapDto(chosen, branchDict);
+                        // (1) most recent WITH RxGroup (fallback: most recent)
+                        var mostRecentWithRx = g
+                            .OrderByDescending(r => !string.IsNullOrWhiteSpace(r.InsuranceRx.RxGroup))
+                            .ThenByDescending(r => r.DrugInsurance.Date)
+                            .ThenByDescending(r => r.DrugInsurance.Id)
+                            .FirstOrDefault();
+                        if (mostRecentWithRx != null)
+                            outRows.Add(MapDto(mostRecentWithRx, branchDict));
+
+                        // (2) highest Net/Quantity
+                        var bestPerItem = g
+                            .OrderByDescending(r => PerItem(r))
+                            .ThenByDescending(r => r.DrugInsurance.Date)
+                            .ThenByDescending(r => r.DrugInsurance.Id)
+                            .FirstOrDefault();
+                        if (bestPerItem != null)
+                            outRows.Add(MapDto(bestPerItem, branchDict));
+
+                        // dedupe by (NDC, ScriptCode) ONLY
+                        var seen = new HashSet<string>();
+                        var deduped = new List<DrugsAlternativesReadDto>();
+                        foreach (var dto in outRows)
+                        {
+                            var key = $"{dto.NDCCode}|{dto.ScriptCode}";
+                            if (seen.Add(key)) deduped.Add(dto);
+                        }
+                        return deduped;
                     })
-                    .OrderByDescending(x => x.Net)
                     .ToList();
             }
             else
             {
-                // Case C: no filters -> per NDC choose up to three UNIQUE rows:
-                // 1) most recent with any RxGroup, 2) most recent with any Bin, 3) fallback most recent overall
+                // NO FILTERS → per NDC pick two (no dedupe), then arrange by NDC
                 grouped = projected
                     .GroupBy(x => x.DrugInsurance.NDCCode)
+                    .OrderBy(g => g.Key) // arrange groups by NDC
                     .SelectMany(g =>
                     {
-                        var ndcRows = g
+                        var picks = new List<dynamic>();
+
+                        // (1) most recent
+                        var mostRecent = g
                             .OrderByDescending(r => r.DrugInsurance.Date)
-                            .ThenByDescending(r => r.DrugInsurance.Net)
-                            .ToList();
+                            .ThenByDescending(r => r.DrugInsurance.Id)
+                            .FirstOrDefault();
+                        if (mostRecent != null) picks.Add(mostRecent);
 
-                        var results = new List<DrugsAlternativesReadDto>();
-                        var seen = new HashSet<string>(); // uniqueness: NDC + InsuranceRxId
+                        // (2) highest Net/Quantity
+                        var bestPerItem = g
+                            .OrderByDescending(r => PerItem(r))
+                            .ThenByDescending(r => r.DrugInsurance.Date)
+                            .ThenByDescending(r => r.DrugInsurance.Id)
+                            .FirstOrDefault();
+                        if (bestPerItem != null) picks.Add(bestPerItem);
 
-                        void AddIfUnique(dynamic row)
+                        // dedupe by (NDC, ScriptCode) ONLY
+                        var seen = new HashSet<string>();
+                        var outRows = new List<DrugsAlternativesReadDto>();
+                        foreach (var row in picks)
                         {
-                            if (row == null) return;
-                            var key = $"{row.DrugInsurance.NDCCode}-{row.InsuranceRx.Id}";
-                            if (seen.Add(key))
-                                results.Add(MapDto(row, branchDict));
+                            var dto = MapDto(row, branchDict);
+                            var key = $"{dto.NDCCode}|{dto.ScriptCode}";
+                            if (seen.Add(key)) outRows.Add(dto);
                         }
-
-                        // 1) most recent with any RxGroup (if exists)
-                        var rxGroupRow = ndcRows.FirstOrDefault(r => !string.IsNullOrWhiteSpace(r.InsuranceRx.RxGroup));
-                        AddIfUnique(rxGroupRow);
-
-                        // 2) most recent with any Bin (if exists)
-                        var anyBinRow = ndcRows.FirstOrDefault(r => !string.IsNullOrWhiteSpace(r.InsuranceRx.InsurancePCN?.Insurance?.Bin));
-                        AddIfUnique(anyBinRow);
-
-                        // 3) fallback most recent overall
-                        var mostRecentRow = ndcRows.FirstOrDefault();
-                        AddIfUnique(mostRecentRow);
-
-                        return results;
+                        return outRows;
                     })
-                    .OrderByDescending(x => x.Net)
                     .ToList();
             }
 
@@ -3006,7 +3008,17 @@ namespace SearchTool_ServerSide.Repository
             };
         }
 
-        // helper mapping (reuse your mapping logic)
+        // --- helpers ---
+
+        private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, int pageSize) => new()
+        {
+            Items = Array.Empty<DrugsAlternativesReadDto>(),
+            TotalCount = 0,
+            TotalPages = 0,
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+
         private DrugsAlternativesReadDto MapDto(dynamic best, Dictionary<int, Branch> branchDict)
         {
             var di = best.DrugInsurance;
@@ -3038,9 +3050,10 @@ namespace SearchTool_ServerSide.Repository
             dto.binId = ir.InsurancePCN?.Insurance?.Id ?? 0;
             dto.pcnId = ir.InsurancePCN?.Id ?? 0;
             dto.rxgroupId = ir.Id;
+
             dto.Status = best.LatestInsuranceStatus?.Status ?? "Not Available";
-            dto.PriorAuthorizationStatus = best.LatestInsuranceStatus?.InsuranceStatus.PriorAuthorizationStatus ?? "NA";
-            dto.ApprovedStatus = best.LatestInsuranceStatus?.InsuranceStatus.ApprovedStatus ?? "NA";
+            dto.PriorAuthorizationStatus = best.LatestInsuranceStatus?.InsuranceStatus?.PriorAuthorizationStatus ?? "NA";
+            dto.ApprovedStatus = best.LatestInsuranceStatus?.InsuranceStatus?.ApprovedStatus ?? "NA";
             dto.DrugAlternativeStatus = best.LatestDrugAlternativeReport?.Status ?? "NA";
 
             if (branchDict.TryGetValue(di.BranchId, out Branch branch))
@@ -3049,6 +3062,7 @@ namespace SearchTool_ServerSide.Repository
             if (dto.Quantity == 0) dto.Quantity = 1;
             return dto;
         }
+
 
         public async Task<AlternativesFilterOptionsDto> GetAlternativesWithInsuranceFilters(
             int classInfoId,
