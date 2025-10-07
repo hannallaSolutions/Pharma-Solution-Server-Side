@@ -70,7 +70,7 @@ namespace SearchTool_ServerSide.Services
             return item;
         }
 
-        internal async Task<DrugsAlternativesReadDto> GetDetails(string ndc, int insuranceId)
+        internal async Task<DrugsAlternativesReadDto> GetDetails(string ndc, int? insuranceId)
         {
             var item = await _drugRepository.GetDetails(ndc, insuranceId);
             return item;
@@ -288,13 +288,14 @@ namespace SearchTool_ServerSide.Services
         public async Task<PagedResult<DrugsAlternativesReadDto>> GetAlternativesWithInsurance(
         int classInfoId,
         string sourceDrugNDC,
+        int matchedRx,
         int pageNumber = 1,
         int pageSize = 10,
         string? rxgroup = null,
         string? pcn = null,
         string? bin = null)
         {
-            return await _drugRepository.GetAlternativesWithInsurance(classInfoId, sourceDrugNDC, pageNumber, pageSize, rxgroup, pcn, bin);
+            return await _drugRepository.GetAlternativesWithInsurance(classInfoId, sourceDrugNDC,matchedRx, pageNumber, pageSize, rxgroup, pcn, bin);
         }
         internal async Task<AlternativesFilterOptionsDto> GetAlternativesWithInsuranceFilters(int classInfoId, string sourceDrugNDC, string? rxgroup = null, string? pcn = null, string? bin = null)
         {

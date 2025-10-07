@@ -2336,91 +2336,126 @@ namespace SearchTool_ServerSide.Repository
             return item;
         }
 
-        internal async Task<DrugsAlternativesReadDto> GetDetails(string ndc, int insuranceId)
+        internal async Task<DrugsAlternativesReadDto?> GetDetails(string ndc, int? insuranceId = null)
         {
-            // 1) Pull the latest DrugInsurance row for this (ndc, insuranceId)
-            var query =
-                from di in _context.DrugInsurances
-                join d in _context.Drugs on ndc equals d.NDC
-                join irx in _context.InsuranceRxes on di.InsuranceId equals irx.Id
-                join ipcn in _context.InsurancePCNs on irx.InsurancePCNId equals ipcn.Id
-                join ins in _context.Insurances on ipcn.InsuranceId equals ins.Id
-                where di.NDCCode == ndc
-                   && di.InsuranceId == insuranceId
-                   && di.Date == _context.DrugInsurances
-                                       .Where(x => x.NDCCode == ndc && x.InsuranceId == insuranceId)
-                                       .Max(x => x.Date) // newest DI row
-                select new
+            // Base projection (reused for both attempts)
+            IQueryable<dynamic> BaseQuery(bool requireScript, int? forceInsuranceId)
+            {
+                var q =
+                    from di in _context.DrugInsurances
+                    join d in _context.Drugs on ndc equals d.NDC
+                    join irx in _context.InsuranceRxes on di.InsuranceId equals irx.Id
+                    join ipcn in _context.InsurancePCNs on irx.InsurancePCNId equals ipcn.Id
+                    join ins in _context.Insurances on ipcn.InsuranceId equals ins.Id
+                    where di.NDCCode == ndc
+                    select new
+                    {
+                        DrugInsurance = di,
+                        Bin = ins.Bin,
+                        BinFullName = ins.Name,
+                        RxGroup = irx.RxGroup,
+                        PCN = ipcn.PCN,
+                        pcnId = ipcn.Id,
+                        rxgroupId = irx.Id,
+                        binId = ins.Id,
+                        Drug = d
+                    };
+
+                if (requireScript)
                 {
-                    DrugInsurance = di,
-                    Bin = ins.Bin,
-                    BinFullName = ins.Name,
-                    RxGroup = irx.RxGroup,
-                    PCN = ipcn.PCN,
-                    pcnId = ipcn.Id,
-                    rxgroupId = irx.Id,
-                    binId = ins.Id,
-                    drug = d
-                };
+                    // Safer for EF translation than IsNullOrWhiteSpace
+                    q = q.Where(x => x.DrugInsurance.ScriptCode != null && x.DrugInsurance.ScriptCode != "");
+                }
 
-            var result = await query.AsNoTracking().FirstOrDefaultAsync();
-            if (result == null) return null;
+                if (forceInsuranceId.HasValue)
+                {
+                    q = q.Where(x => x.DrugInsurance.InsuranceId == forceInsuranceId.Value);
+                }
 
-            // 2) Get ALL matching InsuranceStatus rows (for this InsuranceRx + target NDC), with their Reports
+                return q.OrderByDescending(x => x.DrugInsurance.Date);
+            }
+
+            // 1) If insuranceId was supplied, try newest (ndc, insuranceId) WITH ScriptCode
+            var chosen = insuranceId.HasValue
+                ? await BaseQuery(requireScript: true, forceInsuranceId: insuranceId).AsNoTracking().FirstOrDefaultAsync()
+                : null;
+            // Console.WriteLine("Chosen after first attempt: " + (chosen != null ? "Found" : "Not Found"));
+            // Console.ReadKey();
+            // 2) Fallback: newest (ndc, ANY insurance) WITH ScriptCode
+            if (chosen == null)
+            {
+                chosen = await BaseQuery(requireScript: true, forceInsuranceId: null)
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync();
+            }
+            // Console.WriteLine("Chosen after second attempt: " + (chosen != null ? "Found" : "Not Found"));
+            // Console.ReadKey();
+            // 3) If still nothing with ScriptCode → return null by design
+            if (chosen == null)
+            {
+                // Console.WriteLine("Chosen after third attempt: Not Found");
+                // Console.ReadKey();
+                return null;
+            }
+
+            // Use the effective InsuranceRxId from the selected row (di.InsuranceId → InsuranceRx.Id)
+            int effectiveInsuranceRxId = chosen.DrugInsurance.InsuranceId;
+
+            // Fetch ALL statuses for this InsuranceRx + NDC (with reports)
             var statuses = await _context.InsuranceStatuses
-                .Where(s => s.InsuranceRxId == insuranceId && s.TargetDrugNDC == ndc)
+                .Where(s => s.InsuranceRxId == effectiveInsuranceRxId && s.TargetDrugNDC == ndc)
                 .Include(s => s.Reports)
                 .AsNoTracking()
                 .ToListAsync();
 
-            // Helper: latest report date for a status (DateTime.MinValue if none)
             DateTime LatestReportDate(InsuranceStatus s) =>
                 s.Reports?.OrderByDescending(r => r.StatusDate)
                           .Select(r => r.StatusDate)
                           .FirstOrDefault() ?? DateTime.MinValue;
 
-            // 3) Most recent row that has a PA value
+            // Most recent PA-bearing row
             var latestPAStatusRow = statuses
-                .Where(s => !string.IsNullOrWhiteSpace(s.PriorAuthorizationStatus) && s.PriorAuthorizationStatus != "NA")
+                .Where(s => !string.IsNullOrEmpty(s.PriorAuthorizationStatus) && s.PriorAuthorizationStatus != "NA")
                 .Select(s => new { Row = s, Latest = LatestReportDate(s) })
                 .OrderByDescending(x => x.Latest)
                 .Select(x => x.Row)
                 .FirstOrDefault();
 
-            // 4) Most recent row that has an Approved value
+            // Most recent Approved-bearing row
             var latestApprovedStatusRow = statuses
-                .Where(s => !string.IsNullOrWhiteSpace(s.ApprovedStatus) && s.ApprovedStatus != "NA")
+                .Where(s => !string.IsNullOrEmpty(s.ApprovedStatus) && s.ApprovedStatus != "NA")
                 .Select(s => new { Row = s, Latest = LatestReportDate(s) })
                 .OrderByDescending(x => x.Latest)
                 .Select(x => x.Row)
                 .FirstOrDefault();
 
-            // 5) The single most recent report across ALL rows for the top-level Status
+            // Single most recent report overall → top-line Status
             var latestReport = statuses
                 .SelectMany(s => s.Reports ?? Enumerable.Empty<Report>())
                 .OrderByDescending(r => r.StatusDate)
                 .FirstOrDefault();
 
-            // 6) Build DTO
-            var dto = _mapper.Map<DrugsAlternativesReadDto>(result.DrugInsurance);
-            dto.bin = result.Bin;
-            dto.BinFullName = result.BinFullName;
-            dto.rxgroup = result.RxGroup;
-            dto.pcn = result.PCN;
-            dto.pcnId = result.pcnId;
-            dto.rxgroupId = result.rxgroupId;
-            dto.binId = result.binId;
+            // Build DTO from the SELECTED row (which has ScriptCode)
+            var dto = _mapper.Map<DrugsAlternativesReadDto>(chosen.DrugInsurance);
 
-            // Ensure sensible quantity default
-            dto.Quantity = result.DrugInsurance.Quantity == 0 ? 1 : result.DrugInsurance.Quantity;
+            dto.bin = chosen.Bin;
+            dto.BinFullName = chosen.BinFullName;
+            dto.rxgroup = chosen.RxGroup;
+            dto.pcn = chosen.PCN;
+            dto.pcnId = chosen.pcnId;
+            dto.rxgroupId = chosen.rxgroupId;
+            dto.binId = chosen.binId;
 
-            dto.DrugName = result.drug.Name;
+            // Sensible quantity default
+            dto.Quantity = chosen.DrugInsurance.Quantity == 0 ? 1 : chosen.DrugInsurance.Quantity;
 
-            // Fill PA and Approved independently based on their OWN most-recent rows
+            dto.DrugName = chosen.Drug.Name;
+
+            // Fill PA/Approved independently from their most-recent rows
             dto.PriorAuthorizationStatus = latestPAStatusRow?.PriorAuthorizationStatus ?? "NA";
             dto.ApprovedStatus = latestApprovedStatusRow?.ApprovedStatus ?? "NA";
 
-            // Top-line "Status" stays the most recent Report.Status overall
+            // Top-line status from most recent report
             dto.Status = latestReport?.Status ?? "Not Available";
 
             return dto;
@@ -2789,6 +2824,7 @@ namespace SearchTool_ServerSide.Repository
         public async Task<PagedResult<DrugsAlternativesReadDto>> GetAlternativesWithInsurance(
             int classInfoId,
             string sourceDrugNDC,
+            int matchedRx,
             int pageNumber = 1,
             int pageSize = 10,
             string? rxgroup = null,
@@ -2941,6 +2977,16 @@ namespace SearchTool_ServerSide.Repository
                             .FirstOrDefault();
                         if (bestPerItem != null)
                             outRows.Add(MapDto(bestPerItem, branchDict));
+                        // (3) matchedRx (latest if multiple). Only if matchedRx > 0 and exists in this group.
+                        if (matchedRx > 0)
+                        {
+                            var matchedRxRow = g
+                                .Where(r => r.DrugInsurance.InsuranceId == matchedRx) // or r.InsuranceRx.Id == matchedRx
+                                .OrderByDescending(r => r.DrugInsurance.Date)
+                                .ThenByDescending(r => r.DrugInsurance.Id)
+                                .FirstOrDefault();
+                            if (matchedRxRow != null) outRows.Add(MapDto(matchedRxRow, branchDict));
+                        }
 
                         // dedupe by (NDC, ScriptCode) ONLY
                         var seen = new HashSet<string>();
@@ -2978,6 +3024,15 @@ namespace SearchTool_ServerSide.Repository
                             .ThenByDescending(r => r.DrugInsurance.Id)
                             .FirstOrDefault();
                         if (bestPerItem != null) picks.Add(bestPerItem);
+                        if (matchedRx > 0)
+                        {
+                            var matchedRxRow = g
+                                .Where(r => r.DrugInsurance.InsuranceId == matchedRx) // or r.InsuranceRx.Id == matchedRx
+                                .OrderByDescending(r => r.DrugInsurance.Date)
+                                .ThenByDescending(r => r.DrugInsurance.Id)
+                                .FirstOrDefault();
+                            if (matchedRxRow != null) picks.Add(matchedRxRow);
+                        }
 
                         // dedupe by (NDC, ScriptCode) ONLY
                         var seen = new HashSet<string>();
@@ -4083,59 +4138,241 @@ namespace SearchTool_ServerSide.Repository
         }
 
 
-        internal async Task<ICollection<Drug>> GetDrugsByInsuranceNamePaginated(string insurance, string drugName, int pageSize, int pageNumber)
+        internal async Task<ICollection<Drug>> GetDrugsByInsuranceNamePaginated(
+          string insurance, string drugName, int pageSize, int pageNumber)
         {
+            // Normalize paging
+            pageSize = Math.Max(pageSize, 1);
+            pageNumber = Math.Max(pageNumber, 1);
             int offset = (pageNumber - 1) * pageSize;
 
-            // Enable fuzzy search
+            // Enable fuzzy search for this session (pg_trgm)
             await _context.Database.ExecuteSqlRawAsync("SET pg_trgm.similarity_threshold = 0.3;");
 
-            var sql = @"
+            // Decide limited-by-RxGroup or global:
+            // We only "limit" if there exists at least one DrugInsurance with this RxGroup AND ScriptCode present.
+            bool useGlobal = string.IsNullOrWhiteSpace(insurance);
+            if (!useGlobal)
+            {
+                string rxNorm = insurance.Trim().ToLower();
+                useGlobal = !await _context.DrugInsurances
+                    .Join(_context.InsuranceRxes,
+                          di => di.InsuranceId,
+                          rx => rx.Id,
+                          (di, rx) => new { rx.RxGroup, di.ScriptCode })
+                    .AnyAsync(x =>
+                        x.RxGroup.ToLower() == rxNorm &&
+                        x.ScriptCode != null &&
+                        x.ScriptCode != string.Empty);
+            }
+
+            FormattableString sql;
+
+            if (useGlobal)
+            {
+                // GLOBAL: only drugs that have at least one DrugInsurance with a non-empty ScriptCode
+                sql = $@"
 WITH ranked AS (
     SELECT d.*,
            ROW_NUMBER() OVER (
                ORDER BY (
-                   similarity(d.""name_unaccent"", unaccent({1})) * 0.5 +
-                   ts_rank(d.""name_tsv"", plainto_tsquery(unaccent({1}))) * 0.3 +
-                   CASE WHEN d.""name_soundex"" = soundex(unaccent({1})) THEN 0.1 ELSE 0 END +
-                   CASE WHEN d.""name_unaccent"" ILIKE '%' || unaccent({1}) || '%' THEN 0.1 ELSE 0 END
+                   similarity(d.""name_unaccent"", unaccent({drugName})) * 0.5 +
+                   ts_rank(d.""name_tsv"", plainto_tsquery(unaccent({drugName}))) * 0.3 +
+                   CASE WHEN d.""name_soundex"" = soundex(unaccent({drugName})) THEN 0.1 ELSE 0 END +
+                   CASE WHEN d.""name_unaccent"" ILIKE '%' || unaccent({drugName}) || '%' THEN 0.1 ELSE 0 END
                ) DESC
            ) AS rn,
-           similarity(d.""name_unaccent"", unaccent({1})) AS sim,
-           ts_rank(d.""name_tsv"", plainto_tsquery(unaccent({1}))) AS ts_rank
-    FROM ""DrugInsurances"" di
-    INNER JOIN ""Drugs"" d ON di.""DrugId"" = d.""Id""
-    INNER JOIN ""InsuranceRxes"" rx ON di.""InsuranceId"" = rx.""Id""
-    WHERE LOWER(rx.""RxGroup"") = LOWER({0})
-      AND (
-          d.""name_unaccent"" % unaccent({1}) OR
-          d.""name_tsv"" @@ plainto_tsquery(unaccent({1})) OR
-          d.""name_soundex"" = soundex(unaccent({1})) OR
-          d.""name_unaccent"" ILIKE '%' || unaccent({1}) || '%'
-      )
+           similarity(d.""name_unaccent"", unaccent({drugName})) AS sim,
+           ts_rank(d.""name_tsv"", plainto_tsquery(unaccent({drugName}))) AS ts_rank
+    FROM ""Drugs"" d
+    WHERE
+        (
+            d.""name_unaccent"" % unaccent({drugName}) OR
+            d.""name_tsv"" @@ plainto_tsquery(unaccent({drugName})) OR
+            d.""name_soundex"" = soundex(unaccent({drugName})) OR
+            d.""name_unaccent"" ILIKE '%' || unaccent({drugName}) || '%'
+        )
+        AND EXISTS (
+            SELECT 1
+            FROM ""DrugInsurances"" di
+            WHERE di.""DrugId"" = d.""Id""
+              AND di.""ScriptCode"" IS NOT NULL
+              AND di.""ScriptCode"" <> ''
+        )
 )
 SELECT *
 FROM ranked
 ORDER BY sim DESC, ts_rank DESC
-LIMIT {2} OFFSET {3};
-";
+LIMIT {pageSize} OFFSET {offset};";
+            }
+            else
+            {
+                // LIMITED by RxGroup: still require ScriptCode present, and RxGroup matches
+                sql = $@"
+WITH ranked AS (
+    SELECT d.*,
+           ROW_NUMBER() OVER (
+               ORDER BY (
+                   similarity(d.""name_unaccent"", unaccent({drugName})) * 0.5 +
+                   ts_rank(d.""name_tsv"", plainto_tsquery(unaccent({drugName}))) * 0.3 +
+                   CASE WHEN d.""name_soundex"" = soundex(unaccent({drugName})) THEN 0.1 ELSE 0 END +
+                   CASE WHEN d.""name_unaccent"" ILIKE '%' || unaccent({drugName}) || '%' THEN 0.1 ELSE 0 END
+               ) DESC
+           ) AS rn,
+           similarity(d.""name_unaccent"", unaccent({drugName})) AS sim,
+           ts_rank(d.""name_tsv"", plainto_tsquery(unaccent({drugName}))) AS ts_rank
+    FROM ""Drugs"" d
+    WHERE
+        (
+            d.""name_unaccent"" % unaccent({drugName}) OR
+            d.""name_tsv"" @@ plainto_tsquery(unaccent({drugName})) OR
+            d.""name_soundex"" = soundex(unaccent({drugName})) OR
+            d.""name_unaccent"" ILIKE '%' || unaccent({drugName}) || '%'
+        )
+        AND EXISTS (
+            SELECT 1
+            FROM ""DrugInsurances"" di
+            JOIN ""InsuranceRxes"" rx ON rx.""Id"" = di.""InsuranceId""
+            WHERE di.""DrugId"" = d.""Id""
+              AND di.""ScriptCode"" IS NOT NULL
+              AND di.""ScriptCode"" <> ''
+              AND LOWER(rx.""RxGroup"") = LOWER({insurance})
+        )
+)
+SELECT *
+FROM ranked
+ORDER BY sim DESC, ts_rank DESC
+LIMIT {pageSize} OFFSET {offset};";
+            }
 
+            // Execute safely with parameters
             var drugs = await _context.Drugs
-                .FromSqlRaw(sql, insurance, drugName, pageSize, offset)
+                .FromSqlInterpolated(sql)
                 .AsNoTracking()
                 .ToListAsync();
+
+            // Safety net: if limited query unexpectedly returns zero (race), fallback once.
+            if (!useGlobal && drugs.Count == 0)
+            {
+                FormattableString fallbackSql = $@"
+WITH ranked AS (
+    SELECT d.*,
+           ROW_NUMBER() OVER (
+               ORDER BY (
+                   similarity(d.""name_unaccent"", unaccent({drugName})) * 0.5 +
+                   ts_rank(d.""name_tsv"", plainto_tsquery(unaccent({drugName}))) * 0.3 +
+                   CASE WHEN d.""name_soundex"" = soundex(unaccent({drugName})) THEN 0.1 ELSE 0 END +
+                   CASE WHEN d.""name_unaccent"" ILIKE '%' || unaccent({drugName}) || '%' THEN 0.1 ELSE 0 END
+               ) DESC
+           ) AS rn,
+           similarity(d.""name_unaccent"", unaccent({drugName})) AS sim,
+           ts_rank(d.""name_tsv"", plainto_tsquery(unaccent({drugName}))) AS ts_rank
+    FROM ""Drugs"" d
+    WHERE
+        (
+            d.""name_unaccent"" % unaccent({drugName}) OR
+            d.""name_tsv"" @@ plainto_tsquery(unaccent({drugName})) OR
+            d.""name_soundex"" = soundex(unaccent({drugName})) OR
+            d.""name_unaccent"" ILIKE '%' || unaccent({drugName}) || '%'
+        )
+        AND EXISTS (
+            SELECT 1
+            FROM ""DrugInsurances"" di
+            WHERE di.""DrugId"" = d.""Id""
+              AND di.""ScriptCode"" IS NOT NULL
+              AND di.""ScriptCode"" <> ''
+        )
+)
+SELECT *
+FROM ranked
+ORDER BY sim DESC, ts_rank DESC
+LIMIT {pageSize} OFFSET {offset};";
+
+                drugs = await _context.Drugs
+                    .FromSqlInterpolated(fallbackSql)
+                    .AsNoTracking()
+                    .ToListAsync();
+            }
 
             return drugs;
         }
 
-        internal async Task<ICollection<Drug>> GetDrugsByPCNPaginated(string insurance, string drugName, int pageSize, int pageNumber)
+        internal async Task<ICollection<Drug>> GetDrugsByPCNPaginated(
+    string insurance, string drugName, int pageSize, int pageNumber)
         {
+            // Normalize paging
+            pageSize = Math.Max(pageSize, 1);
+            pageNumber = Math.Max(pageNumber, 1);
             int offset = (pageNumber - 1) * pageSize;
 
+            // Enable fuzzy search for this session
             await _context.Database.ExecuteSqlRawAsync("SET pg_trgm.similarity_threshold = 0.2;");
 
-            var drugs = await _context.Drugs
-                .FromSqlInterpolated($@"
+            // Decide whether to use PCN-limited search or fallback to global
+            bool useGlobal = string.IsNullOrWhiteSpace(insurance);
+
+            if (!useGlobal)
+            {
+                string pcnNorm = insurance.Trim().ToLower();
+
+                // Only consider PCNs that actually have DrugInsurances WITH ScriptCode present
+                useGlobal = !await _context.DrugInsurances
+                    .Join(_context.InsuranceRxes,
+                          di => di.InsuranceId,
+                          rx => rx.Id,
+                          (di, rx) => new { di, rx })
+                    .Join(_context.InsurancePCNs,
+                          x => x.rx.InsurancePCNId,
+                          p => p.Id,
+                          (x, p) => new { p.PCN, x.di.ScriptCode })
+                    .AnyAsync(x =>
+                        x.PCN.ToLower() == pcnNorm &&
+                        x.ScriptCode != null && x.ScriptCode != "");
+            }
+
+            FormattableString sql;
+
+            if (useGlobal)
+            {
+                // GLOBAL: only drugs that have at least one DrugInsurance with non-empty ScriptCode
+                sql = $@"
+WITH ranked AS (
+    SELECT d.*,
+           ROW_NUMBER() OVER (
+               ORDER BY (
+                   similarity(d.""name_unaccent"", unaccent({drugName})) * 0.5 +
+                   ts_rank(d.""name_tsv"", plainto_tsquery(unaccent({drugName}))) * 0.3 +
+                   CASE WHEN d.""name_soundex"" = soundex(unaccent({drugName})) THEN 0.1 ELSE 0 END +
+                   CASE WHEN d.""name_unaccent"" ILIKE '%' || unaccent({drugName}) || '%' THEN 0.1 ELSE 0 END
+               ) DESC
+           ) AS rn,
+           similarity(d.""name_unaccent"", unaccent({drugName})) AS sim,
+           ts_rank(d.""name_tsv"", plainto_tsquery(unaccent({drugName}))) AS ts_rank
+    FROM ""Drugs"" d
+    WHERE
+        (
+            d.""name_unaccent"" % unaccent({drugName}) OR
+            d.""name_tsv"" @@ plainto_tsquery(unaccent({drugName})) OR
+            d.""name_soundex"" = soundex(unaccent({drugName})) OR
+            d.""name_unaccent"" ILIKE '%' || unaccent({drugName}) || '%'
+        )
+        AND EXISTS (
+            SELECT 1
+            FROM ""DrugInsurances"" di
+            WHERE di.""DrugId"" = d.""Id""
+              AND di.""ScriptCode"" IS NOT NULL
+              AND di.""ScriptCode"" <> ''
+        )
+)
+SELECT *
+FROM ranked
+ORDER BY sim DESC, ts_rank DESC
+LIMIT {pageSize} OFFSET {offset};";
+            }
+            else
+            {
+                // PCN-limited: require ScriptCode on the joined DI row
+                sql = $@"
 WITH ranked AS (
     SELECT d.*,
            ROW_NUMBER() OVER (
@@ -4153,6 +4390,8 @@ WITH ranked AS (
     INNER JOIN ""InsuranceRxes"" rx ON di.""InsuranceId"" = rx.""Id""
     INNER JOIN ""InsurancePCNs"" pcn ON rx.""InsurancePCNId"" = pcn.""Id""
     WHERE LOWER(pcn.""PCN"") = LOWER({insurance})
+      AND di.""ScriptCode"" IS NOT NULL
+      AND di.""ScriptCode"" <> ''
       AND (
           d.""name_unaccent"" % unaccent({drugName}) OR
           d.""name_tsv"" @@ plainto_tsquery(unaccent({drugName})) OR
@@ -4163,24 +4402,142 @@ WITH ranked AS (
 SELECT *
 FROM ranked
 ORDER BY sim DESC, ts_rank DESC
-LIMIT {pageSize} OFFSET {offset};
-")
+LIMIT {pageSize} OFFSET {offset};";
+            }
+
+            var drugs = await _context.Drugs
+                .FromSqlInterpolated(sql)
                 .AsNoTracking()
                 .ToListAsync();
 
+            // Safety net: if limited query returned zero (race/edge), fallback once to global (still requiring ScriptCode)
+            if (!useGlobal && drugs.Count == 0)
+            {
+                FormattableString fallbackSql = $@"
+WITH ranked AS (
+    SELECT d.*,
+           ROW_NUMBER() OVER (
+               ORDER BY (
+                   similarity(d.""name_unaccent"", unaccent({drugName})) * 0.5 +
+                   ts_rank(d.""name_tsv"", plainto_tsquery(unaccent({drugName}))) * 0.3 +
+                   CASE WHEN d.""name_soundex"" = soundex(unaccent({drugName})) THEN 0.1 ELSE 0 END +
+                   CASE WHEN d.""name_unaccent"" ILIKE '%' || unaccent({drugName}) || '%' THEN 0.1 ELSE 0 END
+               ) DESC
+           ) AS rn,
+           similarity(d.""name_unaccent"", unaccent({drugName})) AS sim,
+           ts_rank(d.""name_tsv"", plainto_tsquery(unaccent({drugName}))) AS ts_rank
+    FROM ""Drugs"" d
+    WHERE
+        (
+            d.""name_unaccent"" % unaccent({drugName}) OR
+            d.""name_tsv"" @@ plainto_tsquery(unaccent({drugName})) OR
+            d.""name_soundex"" = soundex(unaccent({drugName})) OR
+            d.""name_unaccent"" ILIKE '%' || unaccent({drugName}) || '%'
+        )
+        AND EXISTS (
+            SELECT 1
+            FROM ""DrugInsurances"" di
+            WHERE di.""DrugId"" = d.""Id""
+              AND di.""ScriptCode"" IS NOT NULL
+              AND di.""ScriptCode"" <> ''
+        )
+)
+SELECT *
+FROM ranked
+ORDER BY sim DESC, ts_rank DESC
+LIMIT {pageSize} OFFSET {offset};";
+
+                drugs = await _context.Drugs
+                    .FromSqlInterpolated(fallbackSql)
+                    .AsNoTracking()
+                    .ToListAsync();
+            }
+
             return drugs;
         }
-
-
         internal async Task<ICollection<Drug>> GetDrugsByBINPaginated(
-            string insurance, string drugName, int pageSize, int pageNumber)
+          string insurance, string drugName, int pageSize, int pageNumber)
         {
+            // Normalize paging
+            pageSize = Math.Max(pageSize, 1);
+            pageNumber = Math.Max(pageNumber, 1);
             int offset = (pageNumber - 1) * pageSize;
 
+            // Fuzzy search threshold for this session
             await _context.Database.ExecuteSqlRawAsync("SET pg_trgm.similarity_threshold = 0.2;");
 
-            var drugs = await _context.Drugs
-                .FromSqlInterpolated($@"
+            // Decide whether to use BIN-limited search or fallback to global
+            bool useGlobal = string.IsNullOrWhiteSpace(insurance);
+
+            if (!useGlobal)
+            {
+                string binNorm = insurance.Trim().ToLower();
+
+                // Use BIN-limited path only if there is at least one DI row for this BIN WITH ScriptCode present
+                useGlobal = !await _context.DrugInsurances
+                    .Join(_context.InsuranceRxes,
+                          di => di.InsuranceId,
+                          rx => rx.Id,
+                          (di, rx) => new { di, rx })
+                    .Join(_context.InsurancePCNs,
+                          x => x.rx.InsurancePCNId,
+                          pcn => pcn.Id,
+                          (x, pcn) => new { x.di, x.rx, pcn })
+                    .Join(_context.Insurances,
+                          x => x.pcn.InsuranceId,
+                          i => i.Id,
+                          (x, i) => new { i.Bin, x.di.ScriptCode })
+                    .AnyAsync(x =>
+                        x.Bin.ToLower() == binNorm &&
+                        x.ScriptCode != null && x.ScriptCode != "");
+            }
+
+            FormattableString sql;
+
+            if (useGlobal)
+            {
+                // GLOBAL: only drugs that have at least one DrugInsurance with non-empty ScriptCode
+                sql = $@"
+WITH ranked AS (
+    SELECT d.*,
+           CAST(0 AS numeric) AS ""Net"",
+           CAST(0 AS numeric) AS ""InsurancePayment"",
+           ROW_NUMBER() OVER (
+               ORDER BY (
+                   similarity(d.""name_unaccent"", unaccent({drugName})) * 0.5 +
+                   ts_rank(d.""name_tsv"", plainto_tsquery(unaccent({drugName}))) * 0.3 +
+                   CASE WHEN d.""name_soundex"" = soundex(unaccent({drugName})) THEN 0.1 ELSE 0 END +
+                   CASE WHEN d.""name_unaccent"" ILIKE '%' || unaccent({drugName}) || '%' THEN 0.1 ELSE 0 END
+               ) DESC,
+               1
+           ) AS rn,
+           similarity(d.""name_unaccent"", unaccent({drugName})) AS sim,
+           ts_rank(d.""name_tsv"", plainto_tsquery(unaccent({drugName}))) AS ts_rank
+    FROM ""Drugs"" d
+    WHERE
+        (
+            d.""name_unaccent"" % unaccent({drugName}) OR
+            d.""name_tsv"" @@ plainto_tsquery(unaccent({drugName})) OR
+            d.""name_soundex"" = soundex(unaccent({drugName})) OR
+            d.""name_unaccent"" ILIKE '%' || unaccent({drugName}) || '%'
+        )
+        AND EXISTS (
+            SELECT 1
+            FROM ""DrugInsurances"" di
+            WHERE di.""DrugId"" = d.""Id""
+              AND di.""ScriptCode"" IS NOT NULL
+              AND di.""ScriptCode"" <> ''
+        )
+)
+SELECT *
+FROM ranked
+ORDER BY sim DESC, ts_rank DESC, ""Net"" DESC, ""InsurancePayment"" DESC
+LIMIT {pageSize} OFFSET {offset};";
+            }
+            else
+            {
+                // BIN-limited: require ScriptCode on the joined DI row
+                sql = $@"
 WITH ranked AS (
     SELECT d.*,
            di.""Net"",
@@ -4203,6 +4560,8 @@ WITH ranked AS (
     INNER JOIN ""InsurancePCNs"" pcn ON rx.""InsurancePCNId"" = pcn.""Id""
     INNER JOIN ""Insurances"" i ON pcn.""InsuranceId"" = i.""Id""
     WHERE LOWER(i.""Bin"") = LOWER({insurance})
+      AND di.""ScriptCode"" IS NOT NULL
+      AND di.""ScriptCode"" <> ''
       AND (
           d.""name_unaccent"" % unaccent({drugName}) OR
           d.""name_tsv"" @@ plainto_tsquery(unaccent({drugName})) OR
@@ -4213,10 +4572,59 @@ WITH ranked AS (
 SELECT *
 FROM ranked
 ORDER BY sim DESC, ts_rank DESC, ""Net"" DESC, ""InsurancePayment"" DESC
-LIMIT {pageSize} OFFSET {offset};
-")
+LIMIT {pageSize} OFFSET {offset};";
+            }
+
+            var drugs = await _context.Drugs
+                .FromSqlInterpolated(sql)
                 .AsNoTracking()
                 .ToListAsync();
+
+            // Safety net: if limited query returned zero (race/edge), fallback once to global (still enforcing ScriptCode)
+            if (!useGlobal && drugs.Count == 0)
+            {
+                FormattableString fallbackSql = $@"
+WITH ranked AS (
+    SELECT d.*,
+           CAST(0 AS numeric) AS ""Net"",
+           CAST(0 AS numeric) AS ""InsurancePayment"",
+           ROW_NUMBER() OVER (
+               ORDER BY (
+                   similarity(d.""name_unaccent"", unaccent({drugName})) * 0.5 +
+                   ts_rank(d.""name_tsv"", plainto_tsquery(unaccent({drugName}))) * 0.3 +
+                   CASE WHEN d.""name_soundex"" = soundex(unaccent({drugName})) THEN 0.1 ELSE 0 END +
+                   CASE WHEN d.""name_unaccent"" ILIKE '%' || unaccent({drugName}) || '%' THEN 0.1 ELSE 0 END
+               ) DESC,
+               1
+           ) AS rn,
+           similarity(d.""name_unaccent"", unaccent({drugName})) AS sim,
+           ts_rank(d.""name_tsv"", plainto_tsquery(unaccent({drugName}))) AS ts_rank
+    FROM ""Drugs"" d
+    WHERE
+        (
+            d.""name_unaccent"" % unaccent({drugName}) OR
+            d.""name_tsv"" @@ plainto_tsquery(unaccent({drugName})) OR
+            d.""name_soundex"" = soundex(unaccent({drugName})) OR
+            d.""name_unaccent"" ILIKE '%' || unaccent({drugName}) || '%'
+        )
+        AND EXISTS (
+            SELECT 1
+            FROM ""DrugInsurances"" di
+            WHERE di.""DrugId"" = d.""Id""
+              AND di.""ScriptCode"" IS NOT NULL
+              AND di.""ScriptCode"" <> ''
+        )
+)
+SELECT *
+FROM ranked
+ORDER BY sim DESC, ts_rank DESC, ""Net"" DESC, ""InsurancePayment"" DESC
+LIMIT {pageSize} OFFSET {offset};";
+
+                drugs = await _context.Drugs
+                    .FromSqlInterpolated(fallbackSql)
+                    .AsNoTracking()
+                    .ToListAsync();
+            }
 
             return drugs;
         }
