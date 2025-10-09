@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Drawing;
 using System.Formats.Asn1;
 using System.Globalization;
 using System.Linq;
@@ -2335,19 +2336,36 @@ namespace SearchTool_ServerSide.Repository
             var item = await _context.Drugs.FirstOrDefaultAsync(x => x.NDC == ndc);
             return item;
         }
+        internal async Task<(ICollection<string> InsuranceNDC, ICollection<string> AllInsuranceNDC)> GetDrugInsuranceNDCS(string drugName, int? insuranceId)
+        {
+            if (insuranceId != null)
+            {
+                // Console.WriteLine("Drug Name: " + drugName + " InsuranceId: " + insuranceId);
+                // Console.ReadKey();
+                var items = await _context.DrugInsurances.Include(x => x.Drug).Where(x => x.Drug.Name == drugName && x.InsuranceId == insuranceId).Select(x => x.NDCCode).ToListAsync();
+                var allItems = await _context.DrugInsurances.Include(x => x.Drug).Where(x => x.Drug.Name == drugName && x.InsuranceId != insuranceId && !items.Contains(x.NDCCode)).Select(x => x.NDCCode).ToListAsync();
 
+                // Console.WriteLine("Items Count: " + items.Count + " AllItems Count: " + allItems.Count);
+                // Console.ReadKey();
+                return (items, allItems);
+
+            }
+            return (new List<string>(), new List<string>());
+        }
         internal async Task<DrugsAlternativesReadDto?> GetDetails(string ndc, int? insuranceId = null)
         {
-            // Base projection (reused for both attempts)
+            if (insuranceId == 0) insuranceId = null;
+
+            // Base projection (newest first)
             IQueryable<dynamic> BaseQuery(bool requireScript, int? forceInsuranceId)
             {
                 var q =
-                    from di in _context.DrugInsurances
-                    join d in _context.Drugs on ndc equals d.NDC
-                    join irx in _context.InsuranceRxes on di.InsuranceId equals irx.Id
-                    join ipcn in _context.InsurancePCNs on irx.InsurancePCNId equals ipcn.Id
-                    join ins in _context.Insurances on ipcn.InsuranceId equals ins.Id
-                    where di.NDCCode == ndc
+                    from di in _context.DrugInsurances.AsNoTracking()
+                    join d in _context.Drugs.AsNoTracking() on di.DrugId equals d.Id
+                    join irx in _context.InsuranceRxes.AsNoTracking() on di.InsuranceId equals irx.Id
+                    join ipcn in _context.InsurancePCNs.AsNoTracking() on irx.InsurancePCNId equals ipcn.Id
+                    join ins in _context.Insurances.AsNoTracking() on ipcn.InsuranceId equals ins.Id
+                    where di.NDCCode == ndc && d.NDC == ndc
                     select new
                     {
                         DrugInsurance = di,
@@ -2362,43 +2380,37 @@ namespace SearchTool_ServerSide.Repository
                     };
 
                 if (requireScript)
-                {
-                    // Safer for EF translation than IsNullOrWhiteSpace
                     q = q.Where(x => x.DrugInsurance.ScriptCode != null && x.DrugInsurance.ScriptCode != "");
-                }
 
                 if (forceInsuranceId.HasValue)
-                {
                     q = q.Where(x => x.DrugInsurance.InsuranceId == forceInsuranceId.Value);
-                }
 
-                return q.OrderByDescending(x => x.DrugInsurance.Date);
+                // newest per DI date/id
+                return q.OrderByDescending(x => x.DrugInsurance.Date)
+                        .ThenByDescending(x => x.DrugInsurance.Id);
             }
 
-            // 1) If insuranceId was supplied, try newest (ndc, insuranceId) WITH ScriptCode
+            // 1) Try with the provided insurance id (must have ScriptCode)
             var chosen = insuranceId.HasValue
-                ? await BaseQuery(requireScript: true, forceInsuranceId: insuranceId).AsNoTracking().FirstOrDefaultAsync()
+                ? await BaseQuery(requireScript: true, forceInsuranceId: insuranceId).FirstOrDefaultAsync()
                 : null;
-            // Console.WriteLine("Chosen after first attempt: " + (chosen != null ? "Found" : "Not Found"));
-            // Console.ReadKey();
-            // 2) Fallback: newest (ndc, ANY insurance) WITH ScriptCode
+
+            // 2) Fallback: any insurance for this NDC (still must have ScriptCode)
             if (chosen == null)
             {
-                chosen = await BaseQuery(requireScript: true, forceInsuranceId: null)
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync();
+
+                chosen = await BaseQuery(requireScript: true, forceInsuranceId: null).FirstOrDefaultAsync();
             }
-            // Console.WriteLine("Chosen after second attempt: " + (chosen != null ? "Found" : "Not Found"));
-            // Console.ReadKey();
-            // 3) If still nothing with ScriptCode → return null by design
+
+            // 3) If still nothing with ScriptCode → return null (by design)
             if (chosen == null)
             {
-                // Console.WriteLine("Chosen after third attempt: Not Found");
-                // Console.ReadKey();
+                Console.WriteLine("No DrugInsurance found with ScriptCode for NDC: " + ndc + " and InsuranceId: " + insuranceId);
                 return null;
             }
 
-            // Use the effective InsuranceRxId from the selected row (di.InsuranceId → InsuranceRx.Id)
+
+            // Effective InsuranceRxId from the selected row
             int effectiveInsuranceRxId = chosen.DrugInsurance.InsuranceId;
 
             // Fetch ALL statuses for this InsuranceRx + NDC (with reports)
@@ -2409,33 +2421,25 @@ namespace SearchTool_ServerSide.Repository
                 .ToListAsync();
 
             DateTime LatestReportDate(InsuranceStatus s) =>
-                s.Reports?.OrderByDescending(r => r.StatusDate)
-                          .Select(r => r.StatusDate)
-                          .FirstOrDefault() ?? DateTime.MinValue;
+                s.Reports?.OrderByDescending(r => r.StatusDate).Select(r => r.StatusDate).FirstOrDefault()
+                ?? DateTime.MinValue;
 
-            // Most recent PA-bearing row
             var latestPAStatusRow = statuses
                 .Where(s => !string.IsNullOrEmpty(s.PriorAuthorizationStatus) && s.PriorAuthorizationStatus != "NA")
                 .Select(s => new { Row = s, Latest = LatestReportDate(s) })
-                .OrderByDescending(x => x.Latest)
-                .Select(x => x.Row)
-                .FirstOrDefault();
+                .OrderByDescending(x => x.Latest).Select(x => x.Row).FirstOrDefault();
 
-            // Most recent Approved-bearing row
             var latestApprovedStatusRow = statuses
                 .Where(s => !string.IsNullOrEmpty(s.ApprovedStatus) && s.ApprovedStatus != "NA")
                 .Select(s => new { Row = s, Latest = LatestReportDate(s) })
-                .OrderByDescending(x => x.Latest)
-                .Select(x => x.Row)
-                .FirstOrDefault();
+                .OrderByDescending(x => x.Latest).Select(x => x.Row).FirstOrDefault();
 
-            // Single most recent report overall → top-line Status
             var latestReport = statuses
                 .SelectMany(s => s.Reports ?? Enumerable.Empty<Report>())
                 .OrderByDescending(r => r.StatusDate)
                 .FirstOrDefault();
 
-            // Build DTO from the SELECTED row (which has ScriptCode)
+            // Build DTO from the selected DI row (has ScriptCode)
             var dto = _mapper.Map<DrugsAlternativesReadDto>(chosen.DrugInsurance);
 
             dto.bin = chosen.Bin;
@@ -2446,21 +2450,15 @@ namespace SearchTool_ServerSide.Repository
             dto.rxgroupId = chosen.rxgroupId;
             dto.binId = chosen.binId;
 
-            // Sensible quantity default
             dto.Quantity = chosen.DrugInsurance.Quantity == 0 ? 1 : chosen.DrugInsurance.Quantity;
-
             dto.DrugName = chosen.Drug.Name;
 
-            // Fill PA/Approved independently from their most-recent rows
             dto.PriorAuthorizationStatus = latestPAStatusRow?.PriorAuthorizationStatus ?? "NA";
             dto.ApprovedStatus = latestApprovedStatusRow?.ApprovedStatus ?? "NA";
-
-            // Top-line status from most recent report
             dto.Status = latestReport?.Status ?? "Not Available";
 
             return dto;
         }
-
         internal async Task<DrugClass> getClassbyId(int id)
         {
             var item = await _context.DrugClasses.FirstOrDefaultAsync(x => x.Id == id);

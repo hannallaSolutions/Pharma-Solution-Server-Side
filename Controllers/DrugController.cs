@@ -84,8 +84,10 @@ namespace SearchTool_ServerSide.Controllers
         }
 
         [HttpGet("GetDetails"), AllowAnonymous]
-        public async Task<IActionResult> GetDetails([FromQuery] string ndc, [FromQuery] int? insuranceId)
+        public async Task<IActionResult> GetDetails([FromQuery] string ndc, [FromQuery] int? insuranceId = 0)
         {
+            // Console.WriteLine("NDC: " + ndc + " InsuranceId: " + insuranceId);
+            // Console.ReadKey();
             var items = await _drugService.GetDetails(ndc, insuranceId);
             return Ok(items);
         }
@@ -348,7 +350,7 @@ namespace SearchTool_ServerSide.Controllers
             return Ok(result);
         }
         // YourNamespace/Controllers/DrugController.cs
-        [HttpGet("GetAlternativesNoInsurance"),AllowAnonymous]
+        [HttpGet("GetAlternativesNoInsurance"), AllowAnonymous]
         public async Task<ActionResult<PagedResult<DrugAlternativeLiteDto>>> GetAlternativesNoInsurance(
             [FromQuery] int classInfoId,
             [FromQuery] string sourceDrugNDC,
@@ -358,6 +360,11 @@ namespace SearchTool_ServerSide.Controllers
             var result = await _drugService.GetAlternativesNoInsurancePaged(classInfoId, sourceDrugNDC, pageNumber, pageSize);
             return Ok(result);
         }
-
+        [HttpGet("GetDrugInsuranceNDCS"), Authorize(Policy = "Pharmacist")]
+        public async Task<IActionResult> GetDrugInsuranceNDCS([FromQuery] string drugName, [FromQuery] int? insuranceId)
+        {
+            var items = await _drugService.GetDrugInsuranceNDCS(drugName, insuranceId);
+            return Ok(new { InsuranceNDC = items.InsuranceNDC, AllInsuranceNDC = items.AllInsuranceNDC });
+        }
     }
 }

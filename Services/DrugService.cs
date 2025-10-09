@@ -295,7 +295,7 @@ namespace SearchTool_ServerSide.Services
         string? pcn = null,
         string? bin = null)
         {
-            return await _drugRepository.GetAlternativesWithInsurance(classInfoId, sourceDrugNDC,matchedRx, pageNumber, pageSize, rxgroup, pcn, bin);
+            return await _drugRepository.GetAlternativesWithInsurance(classInfoId, sourceDrugNDC, matchedRx, pageNumber, pageSize, rxgroup, pcn, bin);
         }
         internal async Task<AlternativesFilterOptionsDto> GetAlternativesWithInsuranceFilters(int classInfoId, string sourceDrugNDC, string? rxgroup = null, string? pcn = null, string? bin = null)
         {
@@ -308,6 +308,11 @@ namespace SearchTool_ServerSide.Services
             int pageSize = 10)
         {
             return await _drugRepository.GetAlternativesNoInsurancePaged(classInfoId, sourceDrugNDC, pageNumber, pageSize);
+        }
+        internal async Task<(ICollection<string> InsuranceNDC, ICollection<string> AllInsuranceNDC)> GetDrugInsuranceNDCS(string drugName, int? insuranceId)
+        {
+            var res = await _drugRepository.GetDrugInsuranceNDCS(drugName, insuranceId);
+            return res;
         }
     }
 }
