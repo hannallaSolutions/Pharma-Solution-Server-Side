@@ -69,7 +69,8 @@ namespace SearchTool_ServerSide.Services
                         var searchLog = _mapper.Map<SearchLog>(searchLogAddDto);
 
                         var rxGroup = await _insuranceRepository.GetRXById(searchLog.RxgroupId ?? 0);
-                        searchLog.RxgroupId = rxGroup?.Id ?? 0; // Default to 0 if not found
+
+                        searchLog.RxgroupId = rxGroup?.Id ?? 1; // Default to 1 if not found
                         searchLog.PcnId = rxGroup?.InsurancePCNId ?? 1; // Default to 1 if not found
                         searchLog.BinId = rxGroup?.InsurancePCN?.InsuranceId ?? 1; // Default to 1 if not found
 
@@ -77,6 +78,8 @@ namespace SearchTool_ServerSide.Services
                         searchLog.UserEmail = order.UserEmail;
                         searchLog.User = user;
                         searchLog.Date = DateTime.UtcNow;
+                        Console.WriteLine($"Final SearchLog details: RxgroupId={searchLog.RxgroupId}, PcnId={searchLog.PcnId}, BinId={searchLog.BinId}, OrderItemId={searchLog.OrderItemId}, UserEmail={searchLog.UserEmail}");
+                        Console.ReadKey();
                         await _searchLogRepository.Add(searchLog);
                     }
                     transactionScope.Complete();

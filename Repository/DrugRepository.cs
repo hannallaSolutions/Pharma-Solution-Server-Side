@@ -2350,7 +2350,8 @@ namespace SearchTool_ServerSide.Repository
                 return (items, allItems);
 
             }
-            return (new List<string>(), new List<string>());
+            var allItems2 = await _context.DrugInsurances.Include(x => x.Drug).Where(x => x.Drug.Name == drugName && x.ScriptCode != null).Select(x => x.NDCCode).ToListAsync();
+            return (new List<string>(), allItems2);
         }
         internal async Task<DrugsAlternativesReadDto?> GetDetails(string ndc, int? insuranceId = null)
         {
@@ -3166,6 +3167,7 @@ namespace SearchTool_ServerSide.Repository
             var rel =
                 from br in baseSet
                 join di in _context.DrugInsurances on br.Dc.DrugId equals di.DrugId
+                where di.ScriptCode != null
                 join ir in _context.InsuranceRxes on di.InsuranceId equals ir.Id
                 select new { ir };
 

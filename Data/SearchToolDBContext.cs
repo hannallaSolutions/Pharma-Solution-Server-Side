@@ -404,12 +404,12 @@ namespace SearchTool_ServerSide.Data
                     .OnDelete(DeleteBehavior.Restrict);
 
                 // Optional Insurance FKs
-                entity.HasOne(e => e.Insurance)
+                entity.HasOne(e => e.InsuranceRx)
                     .WithMany()
                     .HasForeignKey(e => e.RxgroupId)
                     .OnDelete(DeleteBehavior.Restrict);
 
-                entity.HasOne(e => e.InsuranceRx)
+                entity.HasOne(e => e.Insurance)
                     .WithMany()
                     .HasForeignKey(e => e.BinId)
                     .OnDelete(DeleteBehavior.Restrict);
