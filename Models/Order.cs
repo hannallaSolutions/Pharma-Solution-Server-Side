@@ -6,6 +6,8 @@ namespace SearchTool_ServerSide.Models
     {
         public int Id { get; set; }
         public string UserEmail { get; set; }
+        public string CustomerName { get; set; }
+        public string CustomerPhone { get; set; }
         public DateTime Date { get; set; }
         public decimal TotalNet { get; set; }
         public decimal TotalPatientPay { get; set; }

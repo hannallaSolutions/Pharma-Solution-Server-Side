@@ -4,6 +4,8 @@ namespace SearchTool_ServerSide.Dtos.OrderDtos
     {
         
         public string UserEmail { get; set; }
+        public string CustomerName { get; set; }
+        public string CustomerPhone { get; set; }
         public DateTime Date { get; set; }
         public decimal TotalNet { get; set; }= 0;
         public decimal TotalPatientPay { get; set; } =  0;

@@ -13,6 +13,8 @@ namespace SearchTool_ServerSide.Dtos.OrderDtos
         public decimal TotalInsurancePay { get; set; }
         public decimal TotalAcquisitionCost { get; set; }
         public decimal AdditionalCost { get; set; }
+        public string CustomerName { get; set; }
+        public string CustomerPhone { get; set; }
         public ICollection<OrderItemReadDto> OrderItemReadDtos { get; set; } = new List<OrderItemReadDto>();
         
     }

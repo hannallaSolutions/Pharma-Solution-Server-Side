@@ -11,7 +11,7 @@ namespace SearchTool_ServerSide.Services
 {
     public class OrderService(DrugRepository _drugrepository, UserRepository _userRepository, InsuranceRepository _insuranceRepository, OrderRepository _orderRepository, OrderItemRepository _orderItemRepository, IMapper _mapper, SearchLogRepository _searchLogRepository)
     {
-        internal async Task CreateOrder(ICollection<OrderItemAddDto> orderItemAddDtos, string userEmail, ICollection<SearchLogAddDto> searchLogAddDtos)
+        internal async Task CreateOrder(ICollection<OrderItemAddDto> orderItemAddDtos, string userEmail, ICollection<SearchLogAddDto> searchLogAddDtos,string customerName="", string customerPhone="")
         {
             var user = await _userRepository.GetUserByEmail(userEmail);
 
@@ -39,7 +39,9 @@ namespace SearchTool_ServerSide.Services
                         TotalPatientPay = orderItemAddDtos.Sum(x => x.PatientPay * x.Amount),
                         TotalInsurancePay = orderItemAddDtos.Sum(x => x.InsurancePay * x.Amount),
                         TotalAcquisitionCost = orderItemAddDtos.Sum(x => x.AcquisitionCost * x.Amount),
-                        AdditionalCost = orderItemAddDtos.Sum(x => x.AdditionalCost * x.Amount)
+                        AdditionalCost = orderItemAddDtos.Sum(x => x.AdditionalCost * x.Amount),
+                        CustomerName = customerName ?? "",
+                        CustomerPhone = customerPhone ?? ""
                     };
                     var order = new Order
                     {
@@ -49,7 +51,9 @@ namespace SearchTool_ServerSide.Services
                         TotalPatientPay = orderAddDto.TotalPatientPay,
                         TotalInsurancePay = orderAddDto.TotalInsurancePay,
                         TotalAcquisitionCost = orderAddDto.TotalAcquisitionCost,
-                        AddtionalCost = orderAddDto.AdditionalCost
+                        AddtionalCost = orderAddDto.AdditionalCost,
+                        CustomerName = orderAddDto.CustomerName,
+                        CustomerPhone = orderAddDto.CustomerPhone,
                     };
 
 
@@ -78,8 +82,7 @@ namespace SearchTool_ServerSide.Services
                         searchLog.UserEmail = order.UserEmail;
                         searchLog.User = user;
                         searchLog.Date = DateTime.UtcNow;
-                        Console.WriteLine($"Final SearchLog details: RxgroupId={searchLog.RxgroupId}, PcnId={searchLog.PcnId}, BinId={searchLog.BinId}, OrderItemId={searchLog.OrderItemId}, UserEmail={searchLog.UserEmail}");
-                        Console.ReadKey();
+                        
                         await _searchLogRepository.Add(searchLog);
                     }
                     transactionScope.Complete();

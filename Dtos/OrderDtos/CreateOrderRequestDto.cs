@@ -7,5 +7,7 @@ namespace SearchTool_ServerSide.Dtos.OrderDtos
     {
         public ICollection<OrderItemAddDto> OrderItems { get; set; }
         public ICollection<SearchLogAddDto> SearchLogs { get; set; }
+        public string CustomerName { get; set; } = "";
+        public string CustomerPhone { get; set; } = "";
     }
 }

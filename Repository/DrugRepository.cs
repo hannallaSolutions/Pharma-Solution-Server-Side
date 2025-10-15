@@ -2342,8 +2342,9 @@ namespace SearchTool_ServerSide.Repository
             {
                 // Console.WriteLine("Drug Name: " + drugName + " InsuranceId: " + insuranceId);
                 // Console.ReadKey();
-                var items = await _context.DrugInsurances.Include(x => x.Drug).Where(x => x.Drug.Name == drugName && x.InsuranceId == insuranceId).Select(x => x.NDCCode).ToListAsync();
-                var allItems = await _context.DrugInsurances.Include(x => x.Drug).Where(x => x.Drug.Name == drugName && x.InsuranceId != insuranceId && !items.Contains(x.NDCCode)).Select(x => x.NDCCode).ToListAsync();
+                var items = await _context.DrugInsurances.Include(x => x.Drug).Where(x => x.Drug.Name == drugName && x.InsuranceId == insuranceId  && x.ScriptCode != null).Select(x => x.NDCCode).ToListAsync();
+                // Console.ReadKey();
+                var allItems = await _context.DrugInsurances.Include(x => x.Drug).Where(x => x.Drug.Name == drugName && x.InsuranceId != insuranceId && !items.Contains(x.NDCCode) && x.ScriptCode != null).Select(x => x.NDCCode).ToListAsync();
 
                 // Console.WriteLine("Items Count: " + items.Count + " AllItems Count: " + allItems.Count);
                 // Console.ReadKey();

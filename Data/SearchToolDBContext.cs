@@ -349,8 +349,9 @@ namespace SearchTool_ServerSide.Data
                 entity.Property(e => e.TotalInsurancePay).HasColumnType("decimal(18,2)");
                 entity.Property(e => e.TotalAcquisitionCost).HasColumnType("decimal(18,2)");
                 entity.Property(e => e.AddtionalCost).HasColumnType("decimal(18,2)");
+                
                 // UserEmail -> User.Email relationship
-
+                
             });
             modelBuilder.Entity<User>(entity =>
                 {

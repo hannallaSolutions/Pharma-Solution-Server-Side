@@ -39,7 +39,7 @@ namespace SearchTool_ServerSide.Controllers
                 return BadRequest("Invalid user ID format");
             }
 
-            await _orderService.CreateOrder(createOrderRequest.OrderItems, userData.Email, createOrderRequest.SearchLogs);
+            await _orderService.CreateOrder(createOrderRequest.OrderItems, userData.Email, createOrderRequest.SearchLogs, createOrderRequest.CustomerName, createOrderRequest.CustomerPhone);
 
             return Ok("Order created successfully.");
         }
