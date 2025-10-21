@@ -16,6 +16,8 @@ namespace SearchTool_ServerSide.Dtos.OrderItemDtos
         public decimal AddtionalCost { get; set; }
         public int? InsuranceRxId { get; set; }
         public string InsuranceRxName { get; set; }
+        public string InsurancePCN { get; set; }
+        public string InsuranceBinFullName { get; set; }
         public int Amount { get; set; }
         public SearchLogReadDto? SearchLogReadDto { get; set; }
     }

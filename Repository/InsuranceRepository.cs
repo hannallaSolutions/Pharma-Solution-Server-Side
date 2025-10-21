@@ -207,9 +207,12 @@ namespace SearchTool_ServerSide.Repository
             {
                 return true;
             }
+           
             var drugInsurance = await _context.DrugInsurances.FirstOrDefaultAsync(x => x.DrugId == request.DrugId && x.InsuranceId == insuranceRX.Id);
+          
             if (drugInsurance == null)
             {
+                
                 return true;
             }
             return false;

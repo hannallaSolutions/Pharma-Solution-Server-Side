@@ -15,6 +15,8 @@ namespace SearchTool_ServerSide.Dtos.OrderDtos
         public decimal AdditionalCost { get; set; }
         public string CustomerName { get; set; }
         public string CustomerPhone { get; set; }
+        public string UserName { get; set; }
+        public string Role { get; set; }
         public ICollection<OrderItemReadDto> OrderItemReadDtos { get; set; } = new List<OrderItemReadDto>();
         
     }

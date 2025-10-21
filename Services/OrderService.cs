@@ -11,7 +11,7 @@ namespace SearchTool_ServerSide.Services
 {
     public class OrderService(DrugRepository _drugrepository, UserRepository _userRepository, InsuranceRepository _insuranceRepository, OrderRepository _orderRepository, OrderItemRepository _orderItemRepository, IMapper _mapper, SearchLogRepository _searchLogRepository)
     {
-        internal async Task CreateOrder(ICollection<OrderItemAddDto> orderItemAddDtos, string userEmail, ICollection<SearchLogAddDto> searchLogAddDtos,string customerName="", string customerPhone="")
+        internal async Task CreateOrder(ICollection<OrderItemAddDto> orderItemAddDtos, string userEmail, ICollection<SearchLogAddDto> searchLogAddDtos, string customerName = "", string customerPhone = "")
         {
             var user = await _userRepository.GetUserByEmail(userEmail);
 
@@ -82,7 +82,7 @@ namespace SearchTool_ServerSide.Services
                         searchLog.UserEmail = order.UserEmail;
                         searchLog.User = user;
                         searchLog.Date = DateTime.UtcNow;
-                        
+
                         await _searchLogRepository.Add(searchLog);
                     }
                     transactionScope.Complete();
@@ -97,6 +97,7 @@ namespace SearchTool_ServerSide.Services
 
         internal async Task<ICollection<OrderHistoryReadDto>> GetAllOrdersByUserId(string userEmail)
         {
+            var users = await _userRepository.GetAll();
             var orders = await _orderRepository.GetAllOrdersByUserId(userEmail);
             if (orders == null || !orders.Any())
             {
@@ -105,6 +106,7 @@ namespace SearchTool_ServerSide.Services
             var orderHistoryReadDtos = new List<OrderHistoryReadDto>();
             foreach (var order in orders)
             {
+                var user = users.FirstOrDefault(u => u.Email == order.UserEmail);
                 var orderItemReadDtos = new List<OrderItemReadDto>();
                 foreach (var item in order.OrderItems)
                 {
@@ -125,10 +127,14 @@ namespace SearchTool_ServerSide.Services
                     orderItemReadDto.NDC = OrderDrug.NDC;
                     var insurance = await _insuranceRepository.GetRXById(item.InsuranceRxId ?? 0);
                     orderItemReadDto.InsuranceRxName = insurance.RxGroup;
+                    orderItemReadDto.InsurancePCN = insurance.InsurancePCN?.PCN;
+                    orderItemReadDto.InsuranceBinFullName = insurance.InsurancePCN?.Insurance.Name;
 
                     orderItemReadDtos.Add(orderItemReadDto);
                 }
                 var orderHistoryReadDto = _mapper.Map<OrderHistoryReadDto>(order);
+                orderHistoryReadDto.UserName = user != null ? user.Name : "Unknown User";
+                orderHistoryReadDto.Role = user != null ? user.Role.ToString() == "Admin" ? "Doctor" : "Pharmacist" : "Unknown Role";
                 orderHistoryReadDto.OrderItemReadDtos = orderItemReadDtos;
                 orderHistoryReadDtos.Add(orderHistoryReadDto);
             }
@@ -137,8 +143,8 @@ namespace SearchTool_ServerSide.Services
 
         internal async Task ViewDrugDetailsLog(string searchLog, TokenReadDto user)
         {
-            await _searchLogRepository.ViewDrugDetailsLog(searchLog,user);
-            
+            await _searchLogRepository.ViewDrugDetailsLog(searchLog, user);
+
         }
     }
 
