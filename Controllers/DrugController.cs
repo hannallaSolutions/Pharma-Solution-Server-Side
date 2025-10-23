@@ -84,11 +84,11 @@ namespace SearchTool_ServerSide.Controllers
         }
 
         [HttpGet("GetDetails"), AllowAnonymous]
-        public async Task<IActionResult> GetDetails([FromQuery] string ndc, [FromQuery] int? insuranceId = 0)
+        public async Task<IActionResult> GetDetails([FromQuery] string ndc,[FromQuery] int sourceInsuranceId, [FromQuery] int? insuranceId = 0)
         {
             // Console.WriteLine("NDC: " + ndc + " InsuranceId: " + insuranceId);
             // Console.ReadKey();
-            var items = await _drugService.GetDetails(ndc, insuranceId);
+            var items = await _drugService.GetDetails(ndc, sourceInsuranceId, insuranceId);
             return Ok(items);
         }
         // [HttpGet("getDrugNDCsByNameInsuance")]
@@ -326,6 +326,7 @@ namespace SearchTool_ServerSide.Controllers
         public async Task<IActionResult> GetAlternativesWithInsurance(
             [FromQuery] int classInfoId,
             [FromQuery] string sourceDrugNDC,
+            [FromQuery] int sourceRxGroupId,
             [FromQuery] int matchedRx,
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
@@ -334,7 +335,7 @@ namespace SearchTool_ServerSide.Controllers
             [FromQuery] string? bin = null)
         {
             var items = await _drugService.GetAlternativesWithInsurance(
-                classInfoId, sourceDrugNDC, matchedRx, pageNumber, pageSize, rxgroup, pcn, bin);
+                classInfoId, sourceDrugNDC,sourceRxGroupId, matchedRx, pageNumber, pageSize, rxgroup, pcn, bin);
             return Ok(items);
         }
         [HttpGet("GetAlternativesWithInsuranceFilters"), AllowAnonymous]

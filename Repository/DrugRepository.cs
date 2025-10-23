@@ -2354,7 +2354,7 @@ namespace SearchTool_ServerSide.Repository
             var allItems2 = await _context.DrugInsurances.Include(x => x.Drug).Where(x => x.Drug.Name == drugName && x.ScriptCode != null).Select(x => x.NDCCode).ToListAsync();
             return (new List<string>(), allItems2);
         }
-        internal async Task<DrugsAlternativesReadDto?> GetDetails(string ndc, int? insuranceId = null)
+        internal async Task<DrugsAlternativesReadDto?> GetDetails(string ndc,int sourceInsuranceId, int? insuranceId = null)
         {
             if (insuranceId == 0) insuranceId = null;
 
@@ -2417,7 +2417,7 @@ namespace SearchTool_ServerSide.Repository
 
             // Fetch ALL statuses for this InsuranceRx + NDC (with reports)
             var statuses = await _context.InsuranceStatuses
-                .Where(s => s.InsuranceRxId == effectiveInsuranceRxId && s.TargetDrugNDC == ndc)
+                .Where(s => s.InsuranceRxId == sourceInsuranceId && s.TargetDrugNDC == ndc)
                 .Include(s => s.Reports)
                 .AsNoTracking()
                 .ToListAsync();
@@ -2824,6 +2824,7 @@ namespace SearchTool_ServerSide.Repository
         public async Task<PagedResult<DrugsAlternativesReadDto>> GetAlternativesWithInsurance(
             int classInfoId,
             string sourceDrugNDC,
+            int sourceRxGroupId,
             int matchedRx,
             int pageNumber = 1,
             int pageSize = 10,
@@ -2900,9 +2901,8 @@ namespace SearchTool_ServerSide.Repository
                 let latestInsuranceStatus =
                     _context.Reports.Include(r => r.InsuranceStatus)
                         .Where(r =>
-                            r.SourceDrugNDC == sourceDrugNDC &&
                             r.TargetDrugNDC == di.NDCCode &&
-                            r.InsuranceRxId == di.InsuranceId)
+                            r.InsuranceRxId == sourceRxGroupId)
                         .OrderByDescending(r => r.StatusDate)
                         .ThenByDescending(r => r.Id)
                         .FirstOrDefault()

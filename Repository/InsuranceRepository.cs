@@ -16,6 +16,11 @@ namespace SearchTool_ServerSide.Repository
             _context = context;
             _mapper = mapper;
         }
+        internal async Task<InsuranceRx> GetInsuranceByName(string name)
+        {
+            var item = await _context.InsuranceRxes.Where(x => x.RxGroup == name).FirstOrDefaultAsync();
+            return item;
+        }
         internal async Task<InsuranceReadDto?> GetInsuranceDetails(int id)
         {
             var item = await (from rx in _context.InsuranceRxes
@@ -154,7 +159,6 @@ namespace SearchTool_ServerSide.Repository
                 };
             }
 
-            // 2) Append a new Report row (history)
             _context.Reports.Add(new Report
             {
                 SourceDrugNDC = request.SourceDrugNDC,

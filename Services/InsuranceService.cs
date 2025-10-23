@@ -12,6 +12,11 @@ namespace SearchTool_ServerSide.Services
             var item = await _insuranceRepository.GetInsuranceDetails(id);
             return item;
         }
+        internal async Task<InsuranceRx> GetInsuranceByName(string name)
+        {
+            var item = await _insuranceRepository.GetInsuranceByName(name);
+            return item;
+        }
         internal async Task<ICollection<InsuranceRx>> GetAllRxGroups()
         {
             var items = await _insuranceRepository.GetAllRxGroups();

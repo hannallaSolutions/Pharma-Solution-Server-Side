@@ -17,6 +17,7 @@ namespace SearchTool_ServerSide.Controllers
             var item = await _insuranceService.GetInsuranceDetails(id);
             return Ok(item);
         }
+        
         [HttpGet("GetAllRxGroups")]
         public async Task<IActionResult> GetAllRxGroups()
         {
@@ -71,6 +72,12 @@ namespace SearchTool_ServerSide.Controllers
             var user = userAccessToken.tokenData();
             await _insuranceService.ReportStatus(request, user.Email);
             return Ok("Report submitted successfully.");
+        }
+        [HttpGet("GetInsuranceByName")]
+        public async Task<IActionResult> GetInsuranceByName([FromQuery] string insuranceName)
+        {
+            var item = await _insuranceService.GetInsuranceByName(insuranceName);
+            return Ok(item);
         }
         [HttpGet("GetReportsAsyncByKey"), AllowAnonymous]
         public async Task<IActionResult> GetReportsAsyncByKey([FromQuery] string sourceDrugNDC, [FromQuery] string targetDrugNDC, [FromQuery] int insuranceRxId)
