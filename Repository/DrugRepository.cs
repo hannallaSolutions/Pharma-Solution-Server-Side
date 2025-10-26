@@ -2342,7 +2342,7 @@ namespace SearchTool_ServerSide.Repository
             {
                 // Console.WriteLine("Drug Name: " + drugName + " InsuranceId: " + insuranceId);
                 // Console.ReadKey();
-                var items = await _context.DrugInsurances.Include(x => x.Drug).Where(x => x.Drug.Name == drugName && x.InsuranceId == insuranceId  && x.ScriptCode != null).Select(x => x.NDCCode).ToListAsync();
+                var items = await _context.DrugInsurances.Include(x => x.Drug).Where(x => x.Drug.Name == drugName && x.InsuranceId == insuranceId && x.ScriptCode != null).Select(x => x.NDCCode).ToListAsync();
                 // Console.ReadKey();
                 var allItems = await _context.DrugInsurances.Include(x => x.Drug).Where(x => x.Drug.Name == drugName && x.InsuranceId != insuranceId && !items.Contains(x.NDCCode) && x.ScriptCode != null).Select(x => x.NDCCode).ToListAsync();
 
@@ -2354,7 +2354,7 @@ namespace SearchTool_ServerSide.Repository
             var allItems2 = await _context.DrugInsurances.Include(x => x.Drug).Where(x => x.Drug.Name == drugName && x.ScriptCode != null).Select(x => x.NDCCode).ToListAsync();
             return (new List<string>(), allItems2);
         }
-        internal async Task<DrugsAlternativesReadDto?> GetDetails(string ndc,int sourceInsuranceId, int? insuranceId = null)
+        internal async Task<DrugsAlternativesReadDto?> GetDetails(string ndc, int sourceInsuranceId, int? insuranceId = null)
         {
             if (insuranceId == 0) insuranceId = null;
 
@@ -2819,6 +2819,13 @@ namespace SearchTool_ServerSide.Repository
             public int Stock { get; set; }
             public string? BranchName { get; set; }
             public string DrugAlternativeStatus { get; set; } = "NA";
+            public string? Status { get; internal set; }
+            public string? StatusDescription { get; internal set; }
+            public string? AdditionalInfo { get; internal set; }
+            public DateTime? StatusDate { get; internal set; }
+            public string ApprovedStatus { get; set; }
+            public string PriorAuthorizationStatus { get; set; }
+            public string SubmitedUser { get; internal set; }
         }
 
         public async Task<PagedResult<DrugsAlternativesReadDto>> GetAlternativesWithInsurance(
@@ -3230,6 +3237,7 @@ namespace SearchTool_ServerSide.Repository
 
         public async Task<PagedResult<DrugAlternativeLiteDto>> GetAlternativesNoInsurancePaged(
     int classInfoId,
+    int rxgroupId,
     string sourceDrugNDC,
     int pageNumber = 1,
     int pageSize = 10)
@@ -3323,12 +3331,30 @@ namespace SearchTool_ServerSide.Repository
                     on new { DrugNDC = br.D.NDC, BranchId = 1 }
                     equals new { dbGroup.DrugNDC, dbGroup.BranchId } into dbGroup
                 from db in dbGroup.DefaultIfEmpty()
+                let latestDrugAlternativeReport =
+                    _context.DrugAlternativeReports
+                        .Where(r => r.SourceDrugNDC == sourceDrugNDC
+                                    && r.TargetDrugNDC == br.D.NDC
+                                    && r.ClassInfoId == br.Ci.Id)
+                        .OrderByDescending(r => r.StatusDate)
+                        .ThenByDescending(r => r.Id)
+                        .FirstOrDefault()
+                let latestInsuranceStatus =
+                    _context.Reports.Include(r => r.InsuranceStatus)
+                        .Where(r =>
+                            r.TargetDrugNDC == br.D.NDC &&
+                            r.InsuranceRxId == rxgroupId)
+                        .OrderByDescending(r => r.StatusDate)
+                        .ThenByDescending(r => r.Id)
+                        .FirstOrDefault()
                 select new
                 {
                     br.D,
                     br.Dc,
                     br.Ci,
-                    DrugBranch = db
+                    DrugBranch = db,
+                    LatestDrugAlternativeReport = latestDrugAlternativeReport,
+                    LatestInsuranceStatus = latestInsuranceStatus
                 }
             ).AsNoTracking().ToListAsync();
 
@@ -3366,7 +3392,14 @@ namespace SearchTool_ServerSide.Repository
                         ApplicationType = best.D.ApplicationType,
                         Stock = best.DrugBranch?.Stock ?? 0,
                         BranchName = "",
-                        DrugAlternativeStatus = latestReport?.Status ?? "NA"
+                        DrugAlternativeStatus = latestReport?.Status ?? "NA",
+                        Status = best.LatestInsuranceStatus?.Status ?? "Not Available",
+                        StatusDescription = best.LatestInsuranceStatus?.StatusDescription,
+                        AdditionalInfo = best.LatestInsuranceStatus?.AdditionalInfo,
+                        StatusDate = best.LatestInsuranceStatus?.StatusDate,
+                        ApprovedStatus = best.LatestInsuranceStatus?.InsuranceStatus?.ApprovedStatus ?? "NA",
+                        PriorAuthorizationStatus = best.LatestInsuranceStatus?.InsuranceStatus?.PriorAuthorizationStatus ?? "NA",
+                        SubmitedUser = best.LatestInsuranceStatus?.User?.Name
                     };
                 })
                 .OrderBy(x => x.DrugName)

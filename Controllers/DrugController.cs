@@ -354,11 +354,12 @@ namespace SearchTool_ServerSide.Controllers
         [HttpGet("GetAlternativesNoInsurance"), AllowAnonymous]
         public async Task<ActionResult<PagedResult<DrugAlternativeLiteDto>>> GetAlternativesNoInsurance(
             [FromQuery] int classInfoId,
+            [FromQuery] int rxgroupId,
             [FromQuery] string sourceDrugNDC,
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10)
         {
-            var result = await _drugService.GetAlternativesNoInsurancePaged(classInfoId, sourceDrugNDC, pageNumber, pageSize);
+            var result = await _drugService.GetAlternativesNoInsurancePaged(classInfoId, rxgroupId, sourceDrugNDC, pageNumber, pageSize);
             return Ok(result);
         }
         [HttpGet("GetDrugInsuranceNDCS"), Authorize(Policy = "Pharmacist")]
