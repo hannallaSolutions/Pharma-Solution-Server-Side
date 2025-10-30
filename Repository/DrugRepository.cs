@@ -3961,7 +3961,8 @@ namespace SearchTool_ServerSide.Repository
                     Discount = scriptItem.Discount,
                     InsurancePayment = scriptItem.InsurancePayment,
                     PatientPayment = scriptItem.PatientPayment,
-                    BranchName = branch.Name
+                    BranchName = branch.Name,
+                    Date = script.Date.ToString("MM-dd-yyyy"),
                 }
             ).ToListAsync();
 

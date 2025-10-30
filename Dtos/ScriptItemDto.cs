@@ -23,5 +23,6 @@ namespace SearchTool_ServerSide.Dtos
         public decimal NetProfit => PatientPayment + InsurancePayment - AcquisitionCost;
         public string NDCCode { get; set; }
         public string BranchName { get; set; }
+        public string Date { get; set; }
     }
 }
