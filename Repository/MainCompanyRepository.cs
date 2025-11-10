@@ -53,14 +53,7 @@ namespace SearchTool_ServerSide.Repository
 
         internal async Task<IEnumerable<MainCompany>> GetAllMainCompaniesAsync()
         {
-            var companies = await _context.MainCompanies
-                .FromSqlRaw(@"
-                    SELECT ""Id"",
-                           pgp_sym_decrypt(""Name"", {0}) AS ""Name"",
-                           ""SpecialtyId""
-                    FROM ""MainCompanies""
-                ", encryptionKey)
-                .ToListAsync();
+            var companies = await _context.MainCompanies.ToListAsync();
 
             return companies;
         }

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SearchTool_ServerSide.Dtos.MainCompanyDtos;
 using SearchTool_ServerSide.Models;
@@ -8,7 +9,7 @@ namespace SearchTool_ServerSide.Controllers
     [ApiController, Route("MainCompany")]
     public class MainCompanyController(MainCompanyService _mainCompanyService) : ControllerBase
     {
-        [HttpGet("GetAllMainCompanies")]
+        [HttpGet("GetAllMainCompanies"), Authorize(Policy = "SuperAdmin")]
         public async Task<IActionResult> GetAllMainCompaniesAsync()
         {
             var companies = await _mainCompanyService.GetAllMainCompaniesAsync();
@@ -21,7 +22,7 @@ namespace SearchTool_ServerSide.Controllers
             var company = await _mainCompanyService.GetMainCompanyByIdAsync(id);
             return company != null ? Ok(company) : NotFound();
         }
-        [HttpPost("AddMainCompany")]
+        [HttpPost("AddMainCompany"), Authorize(Policy = "SuperAdmin")]
         public async Task<IActionResult> AddMainCompanyAsync([FromBody]MainCompanyAddDto mainCompanyDto)
         {
             if (mainCompanyDto == null || string.IsNullOrWhiteSpace(mainCompanyDto.Name) || mainCompanyDto.SpecialtyId <= 0)

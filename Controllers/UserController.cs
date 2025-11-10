@@ -13,13 +13,15 @@ namespace SearchTool_ServerSide.Controllers
     [Route("user")]
     public class UserController(UserSevice _userService, UserAccessToken userAccessToken, LogRepository _logRepository) : ControllerBase
     {
-        [HttpPost]
+        [HttpPost("Register")]
+        
         public async Task<IActionResult> Register([FromBody] UserAddDto userAddDto)
         {
+            Console.WriteLine("Hi : " + userAddDto.Email);
             var oldUser = await _userService.GetUserByEmail(userAddDto.Email);
             if (oldUser != null)
             {
-                return BadRequest("This email is already exist");
+                return Conflict(new { message = "This email already exists." });
             }
             userAddDto.Password = BCrypt.Net.BCrypt.HashPassword(userAddDto.Password);
             var user = await _userService.Register(userAddDto);

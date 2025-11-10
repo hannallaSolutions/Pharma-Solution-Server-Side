@@ -19,9 +19,15 @@ namespace SearchTool_ServerSide.Repository
         {
             var branch = await _context.Branches
                 .Include(b => b.MainCompany)
-                .Include(b=> b.MainCompany.ClassType)
+                .Include(b => b.MainCompany.ClassType)
                 .FirstOrDefaultAsync(b => b.Id == branchId);
             return branch?.MainCompany;
+        }
+        internal async Task<ICollection<Branch>> GetAllBranchesByMainCompanyId(int mainCompanyId)
+        {
+            return await _context.Branches
+                .Where(b => b.MainCompanyId == mainCompanyId)
+                .ToListAsync();
         }
     }
 }

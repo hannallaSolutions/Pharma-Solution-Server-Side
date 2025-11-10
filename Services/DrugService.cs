@@ -28,7 +28,11 @@ namespace SearchTool_ServerSide.Services
             var items = await _drugRepository.GetDrugsByName(name, pageNumber, pageSize);
             return items;
         }
-
+        public async Task<int> ImportDrugInsuranceFileAsync(IFormFile uploadedFile, CancellationToken ct = default)
+        {
+            var result = await _drugRepository.ImportDrugInsuranceFileAsync(uploadedFile, ct);
+            return result;
+        }
         public async Task<ICollection<DrugModal>> GetClassesByName(string name, string classVersion, int pageNumber, int pageSize)
         {
             var items = await _drugRepository.GetClassesByName(name, classVersion, pageNumber, pageSize);
@@ -315,6 +319,11 @@ namespace SearchTool_ServerSide.Services
         {
             var res = await _drugRepository.GetDrugInsuranceNDCS(drugName, insuranceId);
             return res;
+        }
+        internal async Task<ICollection<string>> GetAllDrugClassesVersions()
+        {
+            var items = await _drugRepository.GetAllDrugClassesVersions();
+            return items;
         }
     }
 }

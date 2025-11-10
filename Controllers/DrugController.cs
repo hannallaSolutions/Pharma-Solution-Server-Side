@@ -31,7 +31,23 @@ namespace SearchTool_ServerSide.Controllers
             var items = await _drugService.GetAll();
             return Ok(items);
         }
+        [HttpPost("ImportDrugInsuranceFileAsync"), Authorize(Policy = "SuperAdmin")]
+        [RequestSizeLimit(50_000_000)] // optional: 50 MB
+        public async Task<IActionResult> ImportDrugInsuranceFileAsync([FromForm] IFormFile file, CancellationToken ct)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest("No file was uploaded or the file is empty.");
 
+            var items = await _drugService.ImportDrugInsuranceFileAsync(file, ct);
+
+            return Ok(new
+            {
+                file = file.FileName,
+                size = file.Length,
+                totalSaved = items,
+                status = "Imported"
+            });
+        }
         [HttpGet("SearchByNdc")]
         public async Task<IActionResult> SearchByNdc([FromQuery] string ndc)
         {
@@ -84,7 +100,7 @@ namespace SearchTool_ServerSide.Controllers
         }
 
         [HttpGet("GetDetails"), AllowAnonymous]
-        public async Task<IActionResult> GetDetails([FromQuery] string ndc,[FromQuery] int sourceInsuranceId, [FromQuery] int? insuranceId = 0)
+        public async Task<IActionResult> GetDetails([FromQuery] string ndc, [FromQuery] int sourceInsuranceId, [FromQuery] int? insuranceId = 0)
         {
             // Console.WriteLine("NDC: " + ndc + " InsuranceId: " + insuranceId);
             // Console.ReadKey();
@@ -335,7 +351,7 @@ namespace SearchTool_ServerSide.Controllers
             [FromQuery] string? bin = null)
         {
             var items = await _drugService.GetAlternativesWithInsurance(
-                classInfoId, sourceDrugNDC,sourceRxGroupId, matchedRx, pageNumber, pageSize, rxgroup, pcn, bin);
+                classInfoId, sourceDrugNDC, sourceRxGroupId, matchedRx, pageNumber, pageSize, rxgroup, pcn, bin);
             return Ok(items);
         }
         [HttpGet("GetAlternativesWithInsuranceFilters"), AllowAnonymous]
@@ -367,6 +383,12 @@ namespace SearchTool_ServerSide.Controllers
         {
             var items = await _drugService.GetDrugInsuranceNDCS(drugName, insuranceId);
             return Ok(new { InsuranceNDC = items.InsuranceNDC, AllInsuranceNDC = items.AllInsuranceNDC });
+        }
+        [HttpGet("GetAllDrugClassesVersions"), Authorize(Policy = "Admin")]
+        public async Task<IActionResult> GetAllDrugClassesVersions()
+        {
+            var items = await _drugService.GetAllDrugClassesVersions();
+            return Ok(items);
         }
     }
 }
