@@ -31,7 +31,7 @@ namespace SearchTool_ServerSide.Controllers
             var items = await _drugService.GetAll();
             return Ok(items);
         }
-        [HttpPost("ImportDrugInsuranceFileAsync"), Authorize(Policy = "SuperAdmin")]
+        [HttpPost("ImportDrugInsuranceFileAsync"), Authorize(Policy = "Admin")]
         [RequestSizeLimit(50_000_000)] // optional: 50 MB
         public async Task<IActionResult> ImportDrugInsuranceFileAsync([FromForm] IFormFile file, CancellationToken ct)
         {
