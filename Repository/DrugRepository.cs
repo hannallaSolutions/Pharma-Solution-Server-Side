@@ -7,12 +7,14 @@ using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Transactions;
 using AutoMapper;
 using CsvHelper;
 using CsvHelper.Configuration;
 using CsvHelper.Configuration.Attributes;
 using CsvHelper.TypeConversion;
 using ExcelDataReader;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using OfficeOpenXml;
@@ -186,6 +188,255 @@ namespace SearchTool_ServerSide.Repository
             var ret = await _context.Insurances.Where(x => items.Contains(x.Id)).Select(i => i.Name).ToListAsync();
             return ret;
         }
+        public class DrugClassCsv
+        {
+            [Name("Name")]
+            public string Name { get; set; }
+            [Name("ClassInfo")]
+            public string ClassInfo { get; set; }
+            [Name("NDC")]
+            public string NDC { get; set; }
+        }
+        internal async Task<int> AddClassVersion(IFormFile uploadedFile, ClassTypeAddDto classTypeAddDto, bool isMultiple = false, CancellationToken ct = default)
+        {
+            int savedItems = 0;
+
+            using (var transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            {
+                if (uploadedFile == null || uploadedFile.Length == 0)
+                    throw new ArgumentException("Uploaded file is empty or missing.", nameof(uploadedFile));
+
+
+
+                var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture)
+                {
+                    HasHeaderRecord = true,
+                    HeaderValidated = null,
+                    MissingFieldFound = null,
+                    BadDataFound = null,
+                    DetectDelimiter = true, // handles commas or semicolons safely
+                };
+
+                // ---------- Read CSV directly from the request stream (no file on disk) ----------
+                List<DrugClassCsv> records;
+                using (var stream = uploadedFile.OpenReadStream())
+                using (var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: 64 * 1024, leaveOpen: false))
+                using (var csv = new CsvReader(reader, csvConfig))
+                {
+
+                    records = csv.GetRecords<DrugClassCsv>().ToList();
+                }
+
+                // **Step 2: Load Existing Drug Classes**
+                var classTypes = await _context.ClassTypes.ToDictionaryAsync(di => di.Name, di => di);
+                var classInfos = await _context.ClassInfos.ToDictionaryAsync(di => (di.Name, di.ClassTypeId), di => di);
+                var drugClasses = await _context.DrugClasses.ToDictionaryAsync(dc => (dc.ClassId, dc.DrugId), dc => dc);
+
+                // **Step 3: Load Existing Drugs by NDC & Name**
+                var existingDrugsByNdc = await _context.Drugs
+                    .GroupBy(d => d.NDC)
+                    .ToDictionaryAsync(g => g.Key, g => g.First());
+
+                var existingDrugsByName = await _context.Drugs
+                    .GroupBy(d => d.Name)
+                    .ToDictionaryAsync(g => g.Key, g => g.First());
+                var newClassTypes = new List<ClassType>();
+                var newDrugs = new List<Drug>();
+                var newDrugClasses = new List<DrugClass>();
+                var newClassInfos = new List<ClassInfo>();
+                if (!classTypes.TryGetValue(classTypeAddDto.Name, out var tempClassType))
+                {
+                    tempClassType = new ClassType
+                    {
+                        Name = classTypeAddDto.Name,
+                        Description = classTypeAddDto.Description
+                    };
+                    await _context.ClassTypes.AddAsync(tempClassType);
+                    await _context.SaveChangesAsync();
+                }
+                if (isMultiple)
+                {
+                    foreach (var record in records)
+                    {
+                        var allClassNames = record.ClassInfo.Trim().Split(",");
+                        foreach (var item in allClassNames)
+                        {
+                            var className = item.Trim();
+                            if (string.IsNullOrWhiteSpace(className))
+                            {
+                                continue;
+                            }
+                            var classInfoKey = (className, tempClassType.Id);
+                            if (!classInfos.TryGetValue(classInfoKey, out var classInfo))
+                            {
+                                classInfo = new ClassInfo { Name = className, ClassTypeId = tempClassType.Id };
+                                newClassInfos.Add(classInfo);
+                                classInfos[classInfoKey] = classInfo;
+                            }
+                        }
+                    }
+                    if (newClassInfos.Any())
+                    {
+                        await _context.ClassInfos.AddRangeAsync(newClassInfos);
+                        await _context.SaveChangesAsync();
+                        Console.WriteLine($"Added {newClassInfos.Count} new drug classes at {DateTime.Now}");
+                    }
+                    foreach (var record in records)
+                    {
+                        if (existingDrugsByNdc.TryGetValue(record.NDC, out var drug))
+                        {
+                            var allClassNames = record.ClassInfo.Trim().Split(",");
+                            foreach (var item in allClassNames)
+                            {
+                                var className = item.Trim();
+                                var classInfoKey = (className, tempClassType.Id);
+                                if (classInfos.TryGetValue(classInfoKey, out var classInfo))
+                                {
+                                    if (!drugClasses.TryGetValue((classInfo.Id, drug.Id), out var drugClass))
+                                    {
+                                        drugClass = new DrugClass
+                                        {
+                                            ClassId = classInfo.Id,
+                                            DrugId = drug.Id
+                                        };
+                                        newDrugClasses.Add(drugClass);
+                                        savedItems++;
+                                        drugClasses[(classInfo.Id, drug.Id)] = drugClass;
+                                    }
+                                }
+                            }
+
+                        }
+                    }
+                    if (newDrugClasses.Any())
+                    {
+                        await _context.DrugClasses.AddRangeAsync(newDrugClasses);
+                        await _context.SaveChangesAsync();
+                        Console.WriteLine($"Added {newDrugClasses.Count} new drug classes at {DateTime.Now}");
+                    }
+                }
+                else
+                {
+                    foreach (var record in records)
+                    {
+                        var className = record.ClassInfo;
+                        if (string.IsNullOrWhiteSpace(className))
+                        {
+                            // Skip if className is null or empty
+                            continue;
+                        }
+                        var classInfoKey = (className, tempClassType.Id);
+                        if (!classInfos.TryGetValue(classInfoKey, out var classInfo))
+                        {
+                            classInfo = new ClassInfo { Name = className, ClassTypeId = tempClassType.Id };
+                            newClassInfos.Add(classInfo);
+                            classInfos[classInfoKey] = classInfo;
+                        }
+                    }
+                    if (newClassInfos.Any())
+                    {
+                        await _context.ClassInfos.AddRangeAsync(newClassInfos);
+                        await _context.SaveChangesAsync();
+                        Console.WriteLine($"Added {newClassInfos.Count} new drug classes at {DateTime.Now}");
+                    }
+                    foreach (var record in records)
+                    {
+                        record.NDC = NormalizeNdcTo11Digits(record.NDC);
+                        var drugKey = (record.NDC, record.Name);
+                        if (existingDrugsByNdc.TryGetValue(record.NDC, out var drug))
+                        {
+                            if (classInfos.TryGetValue((record.ClassInfo, tempClassType.Id), out var classInfo))
+                            {
+                                if (!drugClasses.TryGetValue((classInfo.Id, drug.Id), out var drugClass))
+                                {
+                                    drugClass = new DrugClass
+                                    {
+                                        ClassId = classInfo.Id,
+                                        DrugId = drug.Id
+                                    };
+                                    newDrugClasses.Add(drugClass);
+                                    savedItems++;
+                                    drugClasses[(classInfo.Id, drug.Id)] = drugClass;
+                                }
+                            }
+
+                        }
+                    }
+                    if (newDrugClasses.Any())
+                    {
+                        await _context.DrugClasses.AddRangeAsync(newDrugClasses);
+                        await _context.SaveChangesAsync();
+                        Console.WriteLine($"Added {newDrugClasses.Count} new drug classes at {DateTime.Now}");
+                    }
+
+                }
+                var existingScriptItems = await _context.ScriptItems.Include(x => x.Script).ToListAsync();
+                var existingClassInsurances = await _context.ClassInsurances.Where(x => x.ClassInfo.ClassTypeId == tempClassType.Id).ToListAsync();
+
+                var drugIds = await _context.Drugs.Select(d => d.Id).ToListAsync();
+                var allDrugClasses = await _context.DrugClasses
+               .Where(dc => drugIds.Contains(dc.DrugId) && dc.ClassInfo.ClassTypeId == tempClassType.Id)
+               .ToListAsync();
+                var drugClassMap = allDrugClasses
+               .GroupBy(dc => dc.DrugId)
+               .ToDictionary(g => g.Key, g => g.ToList());
+                var ciDict = existingClassInsurances
+                    .ToDictionary(ci => (ci.InsuranceId, ci.ClassInfoId, ci.Date.Year, ci.Date.Month, ci.BranchId));
+                var insuranceRxs = await _context.InsuranceRxes.ToDictionaryAsync(x => x.Id);
+                var newClassInsurances = new List<ClassInsurance>();
+                foreach (var item in existingScriptItems)
+                {
+                    // Use the existing DateTime (Script.Date) and normalize to UTC
+                    DateTime recordDate = item.Script.Date.Kind == DateTimeKind.Utc
+                        ? item.Script.Date
+                        : item.Script.Date.ToUniversalTime();
+
+                    decimal qty = item.Quantity > 0 ? item.Quantity : 1m;
+                    decimal netValue = (item.PatientPayment + item.InsurancePayment - item.AcquisitionCost) / qty;
+                    // Use the first day of the month for ClassInsurance.
+                    DateTime yearMonth = new DateTime(recordDate.Year, recordDate.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+
+                    var classInfoIds = drugClassMap.ContainsKey(item.DrugId) ? drugClassMap[item.DrugId] : new List<DrugClass>();
+                    foreach (var classInfoId in classInfoIds)
+                    {
+                        var ciKey = (item.InsuranceId, classInfoId.ClassId, recordDate.Year, recordDate.Month, item.Script.BranchId);
+                        if (ciDict.TryGetValue(ciKey, out var existingCI))
+                        {
+
+                        }
+                        else
+                        {
+                            var newCI = new ClassInsurance
+                            {
+                                InsuranceId = item.InsuranceId,
+                                InsuranceName = insuranceRxs[item.InsuranceId].RxGroup,
+                                ClassInfoId = classInfoId.ClassId,
+                                DrugId = item.DrugId,
+                                BranchId = item.Script.BranchId,
+                                Date = yearMonth,
+                                ScriptDateTime = item.Script.Date,
+                                ScriptCode = item.Script.ScriptCode,
+                                BestNet = item.NetProfit / qty,
+                                BestACQ = item.AcquisitionCost / qty,
+                                BestInsurancePayment = item.InsurancePayment / qty,
+                                BestPatientPayment = item.PatientPayment / qty,
+                                Qty = item.Quantity,
+                            };
+                            newClassInsurances.Add(newCI);
+                            ciDict.Add(ciKey, newCI);
+                        }
+                    }
+                }
+                if (newClassInsurances.Any())
+                {
+                    await _context.ClassInsurances.AddRangeAsync(newClassInsurances);
+                    await _context.SaveChangesAsync();
+                    Console.WriteLine($"Added {newClassInsurances.Count} new class insurances at {DateTime.Now}");
+                }
+                transaction.Complete();
+            }
+            return savedItems;
+        }
 
         public async Task SaveData(string filePath = "drug_enriched_with_group.csv")
         {
@@ -193,8 +444,10 @@ namespace SearchTool_ServerSide.Repository
 
             static List<DrugCs> LoadDrugsFromCsv(string filePath)
             {
+
                 var config = new CsvConfiguration(CultureInfo.InvariantCulture)
                 {
+
                     HasHeaderRecord = true,
                     HeaderValidated = null,
                     MissingFieldFound = null,
@@ -2309,27 +2562,30 @@ namespace SearchTool_ServerSide.Repository
                 throw new ArgumentException("Uploaded file is empty or missing.", nameof(uploadedFile));
 
             // ========================================================
-            // PHASE 0: Persist the CSV, then read records
+            // PHASE 0: Read CSV directly from the uploaded stream
+            //          (no server file writing)
             // ========================================================
-            var uploadFolder = Path.Combine(Directory.GetCurrentDirectory(), "UploadedCSVs");
-            if (!Directory.Exists(uploadFolder)) Directory.CreateDirectory(uploadFolder);
-
-            var filePath = Path.Combine(uploadFolder, uploadedFile.FileName);
-            using (var fs = new FileStream(filePath, FileMode.Create))
-                await uploadedFile.CopyToAsync(fs, ct);
-
             var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
                 HasHeaderRecord = true,
                 HeaderValidated = null,
                 MissingFieldFound = null,
-                BadDataFound = null
+                BadDataFound = null,
+                // Optional: allow case-insensitive header match if needed
+                // PrepareHeaderForMatch = args => args.Header?.Trim(),
+                // DetectColumnCountChanges = true
             };
 
             List<ScriptRecord> records;
-            using (var reader = new StreamReader(filePath))
+            using (var stream = uploadedFile.OpenReadStream())
+            using (var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: 1024, leaveOpen: false))
             using (var csv = new CsvReader(reader, csvConfig))
             {
+                // If you use custom ClassMap:
+                // csv.Context.RegisterClassMap<ScriptRecordMap>();
+
+                // CsvHelper's GetRecords<T>() is sync enumeration; this is fine for medium files.
+                // For very large files, consider streaming rows and processing in batches.
                 records = csv.GetRecords<ScriptRecord>().ToList();
             }
 
@@ -2339,7 +2595,6 @@ namespace SearchTool_ServerSide.Repository
             // ========================================================
             // PHASE 1: Principal Entities – Insurances & Drugs
             // ========================================================
-            // Preload existing Insurances, PCNs, RxGroups, Drugs, Classes
             var ci = StringComparer.OrdinalIgnoreCase;
 
             // Insurances by BIN (first wins)
@@ -2364,15 +2619,15 @@ namespace SearchTool_ServerSide.Repository
             var drugDict = drugsFromDb.GroupBy(d => d.NDC).ToDictionary(g => g.Key, g => g.First());
             var drugByNameDict = drugsFromDb.GroupBy(d => d.Name).ToDictionary(g => g.Key, g => g.First());
 
-            // For existence checks on DrugClass, use a HashSet of tuple keys
             var existingDrugClasses = await _context.DrugClasses.AsNoTracking().ToListAsync(ct);
-            var drugClassKeySet = new HashSet<(int ClassId, int DrugId)>(existingDrugClasses.Select(dc => (dc.ClassId, dc.DrugId)));
+            var drugClassKeySet = new HashSet<(int ClassId, int DrugId)>(
+                existingDrugClasses.Select(dc => (dc.ClassId, dc.DrugId)));
 
             var newInsurances = new List<Insurance>();
             var newInsurancePCNs = new List<InsurancePCN>();
             var newInsuranceRxes = new List<InsuranceRx>();
             var newDrugs = new List<Drug>();
-            var stagedDrugClassLinks = new List<(string ndc, List<int> classInfoIds)>(); // store using NDC until Drug.Id exists
+            var stagedDrugClassLinks = new List<(string ndc, List<int> classInfoIds)>(); // NDC until Drug.Id exists
 
             const int batchSize = 1000;
             int countPhase1 = 0;
@@ -2425,7 +2680,6 @@ namespace SearchTool_ServerSide.Repository
                         newDrugs.Add(drug);
                         drugDict[record.NDCCode] = drug;
 
-                        // Stage class links to be created after Drugs get Ids
                         var classInfos = await _context.DrugClasses
                             .Where(x => x.DrugId == template.Id)
                             .Select(x => x.ClassId)
@@ -2457,7 +2711,6 @@ namespace SearchTool_ServerSide.Repository
                         await _context.SaveChangesAsync(ct);
                         newDrugs.Clear();
 
-                        // refresh drugDict with Ids (optional if tracking enabled)
                         var ndcs = stagedDrugClassLinks.Select(s => s.ndc).Distinct().ToList();
                         var fresh = await _context.Drugs.Where(d => ndcs.Contains(d.NDC)).ToListAsync(ct);
                         foreach (var d in fresh) drugDict[d.NDC] = d;
@@ -2477,7 +2730,6 @@ namespace SearchTool_ServerSide.Repository
                 await _context.SaveChangesAsync(ct);
                 newDrugs.Clear();
 
-                // refresh post-insert
                 var ndcs = stagedDrugClassLinks.Select(s => s.ndc).Distinct().ToList();
                 var fresh = await _context.Drugs.Where(d => ndcs.Contains(d.NDC)).ToListAsync(ct);
                 foreach (var d in fresh) drugDict[d.NDC] = d;
@@ -2492,12 +2744,9 @@ namespace SearchTool_ServerSide.Repository
                 {
                     var key = (classId, d.Id);
                     if (drugClassKeySet.Add(key))
-                    {
                         newDrugClasses.Add(new DrugClass { ClassId = classId, DrugId = d.Id });
-                    }
                 }
             }
-
             if (newDrugClasses.Any())
             {
                 _context.DrugClasses.AddRange(newDrugClasses);
@@ -2568,7 +2817,6 @@ namespace SearchTool_ServerSide.Repository
 
             foreach (var record in processedRecords)
             {
-                // Quantity parsing
                 decimal qty = 1;
                 if (!string.Equals(record.Quantity, "tableCell29", StringComparison.OrdinalIgnoreCase)
                     && decimal.TryParse(record.Quantity, NumberStyles.Any, CultureInfo.InvariantCulture, out var q))
@@ -2592,7 +2840,7 @@ namespace SearchTool_ServerSide.Repository
                 if (!drugDict.TryGetValue(record.NDCCode, out var drug)) continue;
                 if (!branchDict.TryGetValue(record.Branch, out var branch)) continue;
 
-                // DrugInsurance merge (latest by Date)
+                // DrugInsurance (latest by Date)
                 var diKey = (insuranceRx.Id, drug.Id, branch.Id);
                 if (diDict.TryGetValue(diKey, out var existingDI))
                 {
@@ -2610,7 +2858,7 @@ namespace SearchTool_ServerSide.Repository
                 }
                 else
                 {
-                    newDrugInsurances.Add(new DrugInsurance
+                    var di = new DrugInsurance
                     {
                         InsuranceId = insuranceRx.Id,
                         DrugId = drug.Id,
@@ -2625,17 +2873,18 @@ namespace SearchTool_ServerSide.Repository
                         Discount = record.Discount,
                         InsurancePayment = record.InsurancePayment,
                         PatientPayment = record.PatientPayment,
-                    });
-                    diDict.Add(diKey, newDrugInsurances[^1]);
+                    };
+                    newDrugInsurances.Add(di);
+                    diDict.Add(diKey, di);
                 }
 
-                // ClassInsurance merge (best net per-unit in the month)
+                // ClassInsurance (best net per-unit in the month)
                 if (drugClassMap.TryGetValue(drug.Id, out var classLinks))
                 {
                     foreach (var link in classLinks)
                     {
-                        var ciKey = (insuranceRx.Id, link.ClassId, recordDateUtc.Year, recordDateUtc.Month, branch.Id);
-                        if (ciDict.TryGetValue(ciKey, out var existingCI))
+                        var ciKey2 = (insuranceRx.Id, link.ClassId, recordDateUtc.Year, recordDateUtc.Month, branch.Id);
+                        if (ciDict.TryGetValue(ciKey2, out var existingCI))
                         {
                             if (netPerUnit > existingCI.BestNet)
                             {
@@ -2668,7 +2917,7 @@ namespace SearchTool_ServerSide.Repository
                                 Qty = qty
                             };
                             newClassInsurances.Add(cii);
-                            ciDict.Add(ciKey, cii);
+                            ciDict.Add(ciKey2, cii);
                         }
                     }
                 }
@@ -2714,7 +2963,7 @@ namespace SearchTool_ServerSide.Repository
                     drugBranchDict[tempKey] = db;
                 }
 
-                // Users: owner + prescriber (guard nulls)
+                // Users: owner + prescriber
                 if (!string.IsNullOrWhiteSpace(record.User) && !userDict.ContainsKey(record.User))
                 {
                     var u = new User
@@ -2764,7 +3013,6 @@ namespace SearchTool_ServerSide.Repository
                 if (scriptDict.ContainsKey(record.Script)) continue;
                 if (!branchDict.TryGetValue(record.Branch, out var branch)) continue;
 
-                // Owner may be null; if so, skip assigning UserId
                 userDict.TryGetValue(record.User ?? "", out var owner);
 
                 var sc = new Script
@@ -2787,10 +3035,10 @@ namespace SearchTool_ServerSide.Repository
             // PHASE 4: ScriptItems
             // ========================================================
             var scriptItemDic = await _context.ScriptItems
-               .GroupBy(s => new { s.ScriptId, s.DrugId, s.Script.Date })
-               .ToDictionaryAsync(g => g.Key, g => g.First());
+                .GroupBy(s => new { s.ScriptId, s.DrugId, s.Script.Date })
+                .ToDictionaryAsync(g => g.Key, g => g.First(), ct);
+
             var tempScriptItems = new Dictionary<(int scriptId, int drugId, DateTime date), ScriptItem>();
-            Console.WriteLine("Script item length before  : " + scriptItemDic.Count());
 
             foreach (var record in processedRecords)
             {
@@ -2804,48 +3052,48 @@ namespace SearchTool_ServerSide.Repository
                     continue;
                 if (!scriptDict.TryGetValue(record.Script, out var script))
                     continue;
+
                 decimal realQTY = 1;
                 record.RemainingStock = new Random().Next(10, 101);
-                if (record.Quantity != "tableCell29")
+                if (!string.Equals(record.Quantity, "tableCell29", StringComparison.OrdinalIgnoreCase)
+                    && decimal.TryParse(record.Quantity, NumberStyles.Any, CultureInfo.InvariantCulture, out var qx))
                 {
-                    realQTY = decimal.Parse(record.Quantity);
+                    realQTY = qx == 0 ? 1 : qx;
                 }
 
                 var siKey = (script.Id, drug2.Id, recordDate);
                 var siKey2 = new { ScriptId = script.Id, DrugId = drug2.Id, Date = recordDate };
 
-                if (scriptItemDic.TryGetValue(siKey2, out var existingSI))
-                {
+                if (scriptItemDic.TryGetValue(siKey2, out _))
                     continue;
-                }
-                else
-                {
-                    if (!userDict.TryGetValue(record.Prescriber, out var prescriber))
-                        continue;
-                    var newSI = new ScriptItem
-                    {
-                        ScriptId = script.Id,
-                        DrugId = drug2.Id,
-                        InsuranceId = insurance2.Id,
-                        RxNumber = record.RxNumber,
-                        UserEmail = prescriber.Email,
-                        PF = record.PF,
-                        Quantity = realQTY,
-                        RemainingStock = record.RemainingStock,
-                        AcquisitionCost = record.AcquisitionCost,
-                        Discount = record.Discount,
-                        InsurancePayment = record.InsurancePayment,
-                        PatientPayment = record.PatientPayment,
-                        NDCCode = record.NDCCode
-                    };
 
-                    tempScriptItems.Add(siKey, newSI);
-                    scriptItemDic[siKey2] = newSI;
-                }
+                if (!userDict.TryGetValue(record.Prescriber, out var prescriber))
+                    continue;
+
+                var newSI = new ScriptItem
+                {
+                    ScriptId = script.Id,
+                    DrugId = drug2.Id,
+                    InsuranceId = insurance2.Id,
+                    RxNumber = record.RxNumber,
+                    UserEmail = prescriber.Email,
+                    PF = record.PF,
+                    Quantity = realQTY,
+                    RemainingStock = record.RemainingStock,
+                    AcquisitionCost = record.AcquisitionCost,
+                    Discount = record.Discount,
+                    InsurancePayment = record.InsurancePayment,
+                    PatientPayment = record.PatientPayment,
+                    NDCCode = record.NDCCode
+                };
+
+                tempScriptItems.Add(siKey, newSI);
+                scriptItemDic[siKey2] = newSI;
             }
 
             _context.ScriptItems.AddRange(tempScriptItems.Values);
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(ct);
+
             return tempScriptItems.Count();
         }
 

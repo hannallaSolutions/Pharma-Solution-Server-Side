@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using SearchTool_ServerSide.Authentication;
+using SearchTool_ServerSide.Dtos.ClassDtos;
 using SearchTool_ServerSide.Dtos.ScritpsDto;
 using SearchTool_ServerSide.Models;
 using SearchTool_ServerSide.Services;
@@ -389,6 +390,17 @@ namespace SearchTool_ServerSide.Controllers
         {
             var items = await _drugService.GetAllDrugClassesVersions();
             return Ok(items);
+        }
+        [HttpPost("AddClassVersion"), Authorize(Policy = "SuperAdmin")]
+        [RequestSizeLimit(50_000_000)] // optional: 50 MB
+        public async Task<IActionResult> AddClassVersion([FromForm] ClassVersionUploadDto model)
+        {
+            var result = await _drugService.AddClassVersion(
+                model.UploadedFile,
+                new ClassTypeAddDto { Name = model.Name, Description = model.Description },
+                model.IsMultiple
+            );
+            return Ok(result);
         }
     }
 }

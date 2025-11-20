@@ -325,5 +325,10 @@ namespace SearchTool_ServerSide.Services
             var items = await _drugRepository.GetAllDrugClassesVersions();
             return items;
         }
+        internal async Task<int> AddClassVersion(IFormFile uploadedFile, ClassTypeAddDto classTypeAddDto, bool isMultiple = false, CancellationToken ct = default)
+        {
+            var result = await _drugRepository.AddClassVersion(uploadedFile, classTypeAddDto, isMultiple, ct);
+            return result;
+        }
     }
 }
