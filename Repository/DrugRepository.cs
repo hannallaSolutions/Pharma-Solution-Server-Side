@@ -200,7 +200,7 @@ namespace SearchTool_ServerSide.Repository
         internal async Task<int> AddClassVersion(IFormFile uploadedFile, ClassTypeAddDto classTypeAddDto, bool isMultiple = false, CancellationToken ct = default)
         {
             int savedItems = 0;
-            const int BATCH_SIZE = 10000;
+            const int BATCH_SIZE = 5000;
 
             using (var transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
             {
