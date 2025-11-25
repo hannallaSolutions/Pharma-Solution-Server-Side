@@ -200,6 +200,7 @@ namespace SearchTool_ServerSide.Repository
         internal async Task<int> AddClassVersion(IFormFile uploadedFile, ClassTypeAddDto classTypeAddDto, bool isMultiple = false, CancellationToken ct = default)
         {
             int savedItems = 0;
+            const int BATCH_SIZE = 10000;
 
             using (var transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
             {
@@ -237,10 +238,6 @@ namespace SearchTool_ServerSide.Repository
                     .GroupBy(d => d.NDC)
                     .ToDictionary(g => g.Key, g => g.First());
 
-                var existingDrugsByName = (await _context.Drugs.AsNoTracking().ToListAsync(ct))
-                    .GroupBy(d => d.Name)
-                    .ToDictionary(g => g.Key, g => g.First());
-
                 // ========================================================
                 // PHASE 2: Ensure ClassType exists
                 // ========================================================
@@ -254,6 +251,7 @@ namespace SearchTool_ServerSide.Repository
                     };
                     await _context.ClassTypes.AddAsync(tempClassType, ct);
                     await _context.SaveChangesAsync(ct);
+                    _context.ChangeTracker.Clear();
                     classTypes[tempClassType.Name] = tempClassType;
                 }
 
@@ -261,8 +259,7 @@ namespace SearchTool_ServerSide.Repository
                 // PHASE 3: Process records and build collections
                 // ========================================================
                 var newClassInfos = new List<ClassInfo>();
-                var newDrugClasses = new List<DrugClass>();
-                var classInfosToAdd = new HashSet<string>(); // Track unique class names
+                var classInfosToAdd = new HashSet<string>();
 
                 // First pass: Collect all unique ClassInfo names
                 if (isMultiple)
@@ -304,16 +301,21 @@ namespace SearchTool_ServerSide.Repository
                     }
                 }
 
-                // Bulk insert ClassInfos
+                // Bulk insert ClassInfos in batches
                 if (newClassInfos.Any())
                 {
-                    await _context.ClassInfos.AddRangeAsync(newClassInfos, ct);
-                    await _context.SaveChangesAsync(ct);
+                    for (int i = 0; i < newClassInfos.Count; i += BATCH_SIZE)
+                    {
+                        var batch = newClassInfos.Skip(i).Take(BATCH_SIZE).ToList();
+                        await _context.ClassInfos.AddRangeAsync(batch, ct);
+                        await _context.SaveChangesAsync(ct);
+                        _context.ChangeTracker.Clear();
+                    }
                     Console.WriteLine($"Added {newClassInfos.Count} new ClassInfos at {DateTime.Now}");
 
                     // Reload to get IDs
                     var classNames = newClassInfos.Select(ci => ci.Name).ToList();
-                    var freshClassInfos = await _context.ClassInfos
+                    var freshClassInfos = await _context.ClassInfos.AsNoTracking()
                         .Where(ci => classNames.Contains(ci.Name) && ci.ClassTypeId == tempClassType.Id)
                         .ToListAsync(ct);
 
@@ -324,6 +326,7 @@ namespace SearchTool_ServerSide.Repository
                 }
 
                 // Second pass: Create DrugClass links
+                var newDrugClasses = new List<DrugClass>();
                 var drugClassKeys = new HashSet<(int classId, int drugId)>();
 
                 if (isMultiple)
@@ -391,11 +394,16 @@ namespace SearchTool_ServerSide.Repository
                     }
                 }
 
-                // Bulk insert DrugClasses
+                // Bulk insert DrugClasses in batches
                 if (newDrugClasses.Any())
                 {
-                    await _context.DrugClasses.AddRangeAsync(newDrugClasses, ct);
-                    await _context.SaveChangesAsync(ct);
+                    for (int i = 0; i < newDrugClasses.Count; i += BATCH_SIZE)
+                    {
+                        var batch = newDrugClasses.Skip(i).Take(BATCH_SIZE).ToList();
+                        await _context.DrugClasses.AddRangeAsync(batch, ct);
+                        await _context.SaveChangesAsync(ct);
+                        _context.ChangeTracker.Clear();
+                    }
                     Console.WriteLine($"Added {newDrugClasses.Count} new DrugClasses at {DateTime.Now}");
                 }
 
@@ -428,68 +436,97 @@ namespace SearchTool_ServerSide.Repository
                     .AsNoTracking()
                     .ToDictionaryAsync(x => x.Id, ct);
 
-                // Load ScriptItems with Scripts
-                var existingScriptItems = await _context.ScriptItems
-                    .AsNoTracking()
-                    .Include(x => x.Script)
-                    .ToListAsync(ct);
-
+                // Process ScriptItems in batches to avoid loading all at once
                 var newClassInsurances = new List<ClassInsurance>();
                 var ciKeys = new HashSet<(int, int, int, int, int)>();
 
-                foreach (var item in existingScriptItems)
+                // Get total count for batching
+                var totalScriptItems = await _context.ScriptItems.CountAsync(ct);
+                var scriptBatchSize = 10000;
+
+                for (int skip = 0; skip < totalScriptItems; skip += scriptBatchSize)
                 {
-                    // Skip if this drug doesn't have classes in the current ClassType
-                    if (!drugClassMap.TryGetValue(item.DrugId, out var classLinks))
-                        continue;
+                    var scriptItemsBatch = await _context.ScriptItems
+                        .AsNoTracking()
+                        .Include(x => x.Script)
+                        .OrderBy(x => x.Id)
+                        .Skip(skip)
+                        .Take(scriptBatchSize)
+                        .ToListAsync(ct);
 
-                    // Normalize date to UTC
-                    DateTime recordDate = item.Script.Date.Kind == DateTimeKind.Utc
-                        ? item.Script.Date
-                        : DateTime.SpecifyKind(item.Script.Date, DateTimeKind.Utc);
-
-                    decimal qty = item.Quantity > 0 ? item.Quantity : 1m;
-                    DateTime yearMonth = new DateTime(recordDate.Year, recordDate.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-
-                    // Get insurance name
-                    if (!insuranceRxs.TryGetValue(item.InsuranceId, out var insuranceRx))
-                        continue;
-
-                    foreach (var classLink in classLinks)
+                    foreach (var item in scriptItemsBatch)
                     {
-                        var ciKey = (item.InsuranceId, classLink.ClassId, recordDate.Year, recordDate.Month, item.Script.BranchId);
-
-                        // Skip if already exists or already added
-                        if (ciDict.ContainsKey(ciKey) || !ciKeys.Add(ciKey))
+                        // Skip if this drug doesn't have classes in the current ClassType
+                        if (!drugClassMap.TryGetValue(item.DrugId, out var classLinks))
                             continue;
 
-                        var newCI = new ClassInsurance
-                        {
-                            InsuranceId = item.InsuranceId,
-                            InsuranceName = insuranceRx.RxGroup,
-                            ClassInfoId = classLink.ClassId,
-                            DrugId = item.DrugId,
-                            BranchId = item.Script.BranchId,
-                            Date = yearMonth,
-                            ScriptDateTime = recordDate,
-                            ScriptCode = item.Script.ScriptCode,
-                            BestNet = item.NetProfit / qty,
-                            BestACQ = item.AcquisitionCost / qty,
-                            BestInsurancePayment = item.InsurancePayment / qty,
-                            BestPatientPayment = item.PatientPayment / qty,
-                            Qty = qty
-                        };
+                        // Normalize date to UTC
+                        DateTime recordDate = item.Script.Date.Kind == DateTimeKind.Utc
+                            ? item.Script.Date
+                            : DateTime.SpecifyKind(item.Script.Date, DateTimeKind.Utc);
 
-                        newClassInsurances.Add(newCI);
-                        ciDict[ciKey] = newCI;
+                        decimal qty = item.Quantity > 0 ? item.Quantity : 1m;
+                        DateTime yearMonth = new DateTime(recordDate.Year, recordDate.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+
+                        // Get insurance name
+                        if (!insuranceRxs.TryGetValue(item.InsuranceId, out var insuranceRx))
+                            continue;
+
+                        foreach (var classLink in classLinks)
+                        {
+                            var ciKey = (item.InsuranceId, classLink.ClassId, recordDate.Year, recordDate.Month, item.Script.BranchId);
+
+                            // Skip if already exists or already added
+                            if (ciDict.ContainsKey(ciKey) || !ciKeys.Add(ciKey))
+                                continue;
+
+                            var newCI = new ClassInsurance
+                            {
+                                InsuranceId = item.InsuranceId,
+                                InsuranceName = insuranceRx.RxGroup,
+                                ClassInfoId = classLink.ClassId,
+                                DrugId = item.DrugId,
+                                BranchId = item.Script.BranchId,
+                                Date = yearMonth,
+                                ScriptDateTime = recordDate,
+                                ScriptCode = item.Script.ScriptCode,
+                                BestNet = item.NetProfit / qty,
+                                BestACQ = item.AcquisitionCost / qty,
+                                BestInsurancePayment = item.InsurancePayment / qty,
+                                BestPatientPayment = item.PatientPayment / qty,
+                                Qty = qty
+                            };
+
+                            newClassInsurances.Add(newCI);
+                            ciDict[ciKey] = newCI;
+                        }
+                    }
+
+                    // Save in sub-batches if collection gets too large
+                    if (newClassInsurances.Count >= BATCH_SIZE)
+                    {
+                        for (int i = 0; i < newClassInsurances.Count; i += BATCH_SIZE)
+                        {
+                            var batch = newClassInsurances.Skip(i).Take(BATCH_SIZE).ToList();
+                            await _context.ClassInsurances.AddRangeAsync(batch, ct);
+                            await _context.SaveChangesAsync(ct);
+                            _context.ChangeTracker.Clear();
+                        }
+                        Console.WriteLine($"Saved {newClassInsurances.Count} ClassInsurances in progress at {DateTime.Now}");
+                        newClassInsurances.Clear();
                     }
                 }
 
-                // Bulk insert ClassInsurances
+                // Bulk insert remaining ClassInsurances in batches
                 if (newClassInsurances.Any())
                 {
-                    await _context.ClassInsurances.AddRangeAsync(newClassInsurances, ct);
-                    await _context.SaveChangesAsync(ct);
+                    for (int i = 0; i < newClassInsurances.Count; i += BATCH_SIZE)
+                    {
+                        var batch = newClassInsurances.Skip(i).Take(BATCH_SIZE).ToList();
+                        await _context.ClassInsurances.AddRangeAsync(batch, ct);
+                        await _context.SaveChangesAsync(ct);
+                        _context.ChangeTracker.Clear();
+                    }
                     Console.WriteLine($"Added {newClassInsurances.Count} new ClassInsurances at {DateTime.Now}");
                 }
 
