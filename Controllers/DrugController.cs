@@ -402,5 +402,11 @@ namespace SearchTool_ServerSide.Controllers
             );
             return Ok(result);
         }
+        [HttpGet("GetAllDrugsForSuperAdmin"), Authorize(Policy = "SuperAdmin")]
+        public async Task<IActionResult> GetAllDrugsForSuperAdmin([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20)
+        {
+            var items = await _drugService.GetAllDrugsForSuperAdminAsync(pageNumber, pageSize);
+            return Ok(items);
+        }
     }
 }

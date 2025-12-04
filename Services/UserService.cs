@@ -149,5 +149,22 @@ namespace SearchTool_ServerSide.Services
             var users = _mapper.Map<IEnumerable<User>>(items);
             await _userRepository.AddAllUserData(users);
         }
+        internal async Task<ICollection<UserReadDto>> GetAllUsers()
+        {
+            return await _userRepository.GetAllUsers();
+        }
+        internal async Task<bool> ResetUserPassword(string userEmail)
+        {
+            return await _userRepository.ResetUserPassword(userEmail);
+        }
+        internal async Task<UserReadDto?> EditUser(int userId, UserReadDto userReadDto)
+        {
+            var updatedUser = await _userRepository.EditUser(userId, userReadDto);
+            if (updatedUser == null)
+            {
+                return null;
+            }
+            return userReadDto;
+        }
     }
 }

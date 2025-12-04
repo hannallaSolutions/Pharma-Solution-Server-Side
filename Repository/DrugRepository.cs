@@ -5902,6 +5902,49 @@ LIMIT {pageSize} OFFSET {offset};";
             var items = await _context.ClassTypes.Select(x => x.Name).Where(x => !x.Contains("test") && !x.Contains("Test")).ToListAsync();
             return items;
         }
+        internal async Task<ICollection<SuperAdminDrugReadDto>> GetAllDrugsForSuperAdminAsync(
+            int pageNumber, int pageSize)
+        {
+            pageNumber = pageNumber > 0 ? pageNumber : 1;
+            pageSize = pageSize > 0 ? pageSize : 10;
+
+            var drugs = await _context.Drugs
+                .OrderBy(d => d.Id)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .Select(d => new SuperAdminDrugReadDto
+                {
+                    Id = d.Id,
+                    Name = d.Name,
+                    NDC = d.NDC,
+                    Form = d.Form,
+                    Strength = d.Strength,
+                    ACQ = d.ACQ,
+                    AWP = d.AWP,
+                    Rxcui = d.Rxcui ?? 0,
+                    Route = d.Route,
+                    TECode = d.TECode,
+                    Ingrdient = d.Ingrdient,
+                    ApplicationNumber = d.ApplicationNumber,
+                    ApplicationType = d.ApplicationType,
+                    StrengthUnit = d.StrengthUnit,
+                    Type = d.Type,
+
+                    Classes = _context.DrugClasses
+                        .Where(dc => dc.DrugId == d.Id)
+                        .Select(dc => dc.ClassInfo)
+                        .ToList(),
+
+                    RxGroups = _context.DrugInsurances
+                        .Where(di => di.DrugId == d.Id)
+                        .Select(di => di.Insurance)
+                        .Distinct()
+                        .ToList()
+                })
+                .ToListAsync();
+
+            return drugs;
+        }
 
     }
     // public sealed class InsuranceMap : ClassMap<Insurance>

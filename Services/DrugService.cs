@@ -330,5 +330,10 @@ namespace SearchTool_ServerSide.Services
             var result = await _drugRepository.AddClassVersion(uploadedFile, classTypeAddDto, isMultiple, ct);
             return result;
         }
+        internal async Task<ICollection<SuperAdminDrugReadDto>> GetAllDrugsForSuperAdminAsync(int pageNumber = 1, int pageSize = 20)
+        {
+            var items = await _drugRepository.GetAllDrugsForSuperAdminAsync(pageNumber, pageSize);
+            return items;
+        }
     }
 }

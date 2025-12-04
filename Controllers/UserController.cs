@@ -169,6 +169,31 @@ namespace SearchTool_ServerSide.Controllers
 
             return Ok("LogOut Success");
         }
-
+        [HttpGet("AllUsers"), Authorize(Policy = "SuperAdmin")]
+        public async Task<IActionResult> GetAllUsers()
+        {
+            var users = await _userService.GetAllUsers();
+            return Ok(users);
+        }
+        [HttpPost("ResetPassword"), Authorize(Policy = "SuperAdmin")]
+        public async Task<IActionResult> ResetUserPassword([FromQuery] string userEmail)
+        {
+            var result = await _userService.ResetUserPassword(userEmail);
+            if (!result)
+            {
+                return BadRequest("User not found");
+            }
+            return Ok("Password reset successfully");
+        }
+        [HttpPost("EditUser"), Authorize(Policy = "SuperAdmin")]
+        public async Task<IActionResult> EditUser([FromQuery]int userId, [FromBody]UserReadDto userReadDto)
+        {
+            var updatedUser = await _userService.EditUser(userId, userReadDto);
+            if (updatedUser == null)
+            {
+                return NotFound("User not found");
+            }
+            return Ok(updatedUser);
+        }
     }
 }
