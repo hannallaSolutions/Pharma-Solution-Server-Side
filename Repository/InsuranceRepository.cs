@@ -196,31 +196,82 @@ namespace SearchTool_ServerSide.Repository
         }
         internal async Task<bool> CheckInsuranceAvailability(CustomAddDrugInsuranceRequest request)
         {
-            var insuranceBIN = await _context.Insurances.FirstOrDefaultAsync(x => x.Name == request.InsuranceBin);
-            if (request.InsuranceBin != null && insuranceBIN == null)
+            if (request == null)
+                throw new ArgumentNullException(nameof(request));
+
+            // 1) BIN
+            Insurance insuranceBIN = null;
+            if (!string.IsNullOrEmpty(request.InsuranceBin))
             {
-                return true;
+                insuranceBIN = await _context.Insurances
+                    .FirstOrDefaultAsync(x => x.Name == request.InsuranceBin);
+
+                Console.WriteLine("insuranceBIN: " + (insuranceBIN?.Id.ToString() ?? "null"));
+
+                // if BIN in request but not found in DB
+                if (insuranceBIN == null)
+                    return true;
             }
-            var insurancePCN = await _context.InsurancePCNs.FirstOrDefaultAsync(x => x.PCN == request.InsurancePCN && x.InsuranceId == insuranceBIN.Id);
-            if (request.InsurancePCN != null && insurancePCN == null)
+
+            // 2) PCN
+            InsurancePCN insurancePCN = null;
+            if (!string.IsNullOrEmpty(request.InsurancePCN))
             {
-                return true;
+                // can't search PCN if BIN not found
+                if (insuranceBIN == null)
+                    return true;
+
+                insurancePCN = await _context.InsurancePCNs
+                    .FirstOrDefaultAsync(x =>
+                        x.PCN == request.InsurancePCN &&
+                        x.InsuranceId == insuranceBIN.Id);
+
+                Console.WriteLine("insurancePCN: " + (insurancePCN?.Id.ToString() ?? "null"));
+
+                if (insurancePCN == null)
+                    return true;
             }
-            var insuranceRX = await _context.InsuranceRxes.FirstOrDefaultAsync(x => x.RxGroup == request.InsuranceRx && x.InsurancePCNId == insurancePCN.Id);
-            if (request.InsuranceRx != null && insuranceRX == null)
+
+            // 3) RxGroup
+            InsuranceRx insuranceRX = null;
+            if (!string.IsNullOrEmpty(request.InsuranceRx))
             {
-                return true;
+                if (insurancePCN == null)
+                    return true;
+
+                insuranceRX = await _context.InsuranceRxes
+                    .FirstOrDefaultAsync(x =>
+                        x.RxGroup == request.InsuranceRx &&
+                        x.InsurancePCNId == insurancePCN.Id);
+
+                Console.WriteLine("insuranceRX: " + (insuranceRX?.Id.ToString() ?? "null"));
+
+                if (insuranceRX == null)
+                    return true;
             }
-           
-            var drugInsurance = await _context.DrugInsurances.FirstOrDefaultAsync(x => x.DrugId == request.DrugId && x.InsuranceId == insuranceRX.Id);
-          
+
+            // 4) DrugInsurance
+            if (insuranceRX == null)
+                return true;
+
+            var drugInsurance = await _context.DrugInsurances
+                .FirstOrDefaultAsync(x =>
+                    x.DrugId == request.DrugId &&
+                    x.InsuranceId == insuranceRX.Id);
+
+            Console.WriteLine(
+                "drugId: " + request.DrugId +
+                " insuranceRX.Id: " + insuranceRX.Id +
+                " drugInsurance: " + (drugInsurance?.DrugId.ToString() ?? "null")
+            );
+
             if (drugInsurance == null)
-            {
-                
                 return true;
-            }
+
+            // if everything exists -> not available to add (based on your current logic)
             return false;
         }
+
         internal async Task HandleCustomAddDrugInsurance(CustomAddDrugInsuranceRequest request, CancellationToken ct = default, int branchId = 1, string userEmail = "")
         {
             var insuranceBIN = await _context.Insurances.FirstOrDefaultAsync(x => x.Name == request.InsuranceBin, ct);

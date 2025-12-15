@@ -82,7 +82,8 @@ namespace SearchTool_ServerSide.Repository
             {
                 return false;
             }
-            var newHashedPassword = BCrypt.Net.BCrypt.HashPassword($"{user.Name}@HannaWest2025");
+            var cleanName = string.Concat(user.Name.Where(c => !char.IsWhiteSpace(c)));
+            var newHashedPassword = BCrypt.Net.BCrypt.HashPassword($"{cleanName}@HannaWest2025");
             user.Password = newHashedPassword;
             await _context.SaveChangesAsync();
             return true;
