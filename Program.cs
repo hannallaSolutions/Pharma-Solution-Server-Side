@@ -99,16 +99,16 @@ builder.Services.AddMemoryCache();
 
 // };
 
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("CorsPolicy", policy =>
-    {
-        policy.WithOrigins(allowedOrigins.ToArray())
-              .AllowCredentials()
-              .AllowAnyHeader()
-              .AllowAnyMethod();
-    });
-});
+// builder.Services.AddCors(options =>
+// {
+//     options.AddPolicy("CorsPolicy", policy =>
+//     {
+//         policy.WithOrigins(allowedOrigins.ToArray())
+//               .AllowCredentials()
+//               .AllowAnyHeader()
+//               .AllowAnyMethod();
+//     });
+// });
 
 
 
