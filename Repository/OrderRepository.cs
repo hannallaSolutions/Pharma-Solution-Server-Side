@@ -30,16 +30,26 @@ namespace SearchTool_ServerSide.Repository
             var mainCompanyName = user.Branch.MainCompany.Name;
 
             // Get all user emails in the same main company
+            //if the user is Doctor, we need to get only his orders
+            if (user.Role == Role.Doctor)
+            {
+                var doctorOrders = await _context.Orders
+                    .Include(o => o.OrderItems)
+                    .Where(o => o.UserEmail == UserEmail)
+                    .ToListAsync();
+
+                return doctorOrders;
+            }
             var companyUserEmails = await _context.Users
                 .Include(u => u.Branch)
                 .ThenInclude(b => b.MainCompany)
-                .Where(u => u.Branch.MainCompany.Name == mainCompanyName)
+                .Where(u => u.Branch.MainCompany.Name == mainCompanyName && u.Email != UserEmail && u.Role == Role.Doctor)
                 .Select(u => u.Email)
                 .ToListAsync();
 
             var orders = await _context.Orders
                 .Include(o => o.OrderItems)
-                .Where(o => companyUserEmails.Contains(o.UserEmail))
+                .Where(o => companyUserEmails.Contains(o.UserEmail) || o.UserEmail == UserEmail)
                 .ToListAsync();
 
             return orders;

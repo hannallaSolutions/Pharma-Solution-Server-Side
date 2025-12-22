@@ -5,6 +5,6 @@ namespace SearchTool_ServerSide.Models
         Admin,
         Pharmacist,
         SuperAdmin,
-        Prescriber
+        Doctor
     }
 }

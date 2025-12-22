@@ -24,7 +24,7 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("Admin",
     builder => { builder.RequireRole("Admin", "SuperAdmin"); });
     options.AddPolicy("Pharmacist",
-    builder => { builder.RequireRole("Pharmacist", "Admin", "SuperAdmin"); });
+    builder => { builder.RequireRole("Pharmacist", "Admin", "SuperAdmin","Doctor"); });
 
 });
 

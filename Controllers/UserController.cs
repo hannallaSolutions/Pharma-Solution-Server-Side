@@ -185,7 +185,7 @@ namespace SearchTool_ServerSide.Controllers
             }
             return Ok("Password reset successfully");
         }
-        [HttpPost("EditUser"), Authorize(Policy = "SuperAdmin")]
+        [HttpPut("EditUser"), Authorize(Policy = "SuperAdmin")]
         public async Task<IActionResult> EditUser([FromQuery]int userId, [FromBody]UserReadDto userReadDto)
         {
             var updatedUser = await _userService.EditUser(userId, userReadDto);

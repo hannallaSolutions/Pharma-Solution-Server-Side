@@ -91,9 +91,6 @@ namespace SearchTool_ServerSide.Services
         {
             var user = await _userRepository.GetById(id);
             var userReadDto = _mapper.Map<UserReadDto>(user);
-            userReadDto.RoleName = user.Role.ToString();
-            var branch = await _branchRepository.GetById(user.BranchId);
-            userReadDto.BranchName = branch.Name;
             return userReadDto;
         }
 
