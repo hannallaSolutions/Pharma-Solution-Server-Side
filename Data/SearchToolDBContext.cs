@@ -30,6 +30,8 @@ namespace SearchTool_ServerSide.Data
         public DbSet<Order> Orders { get; set; }
         public DbSet<OrderItem> OrderItems { get; set; }
         public DbSet<Product> Products { get; set; }
+public DbSet<Permission> Permissions { get; set; }
+public DbSet<UserPermission> UserPermissions { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -137,6 +139,10 @@ namespace SearchTool_ServerSide.Data
         public DbSet<Report> Reports { get; set; }
         public DbSet<DrugAlternativeStatus> DrugAlternativeStatuses { get; set; }
         public DbSet<DrugAlternativeReport> DrugAlternativeReports { get; set; }
+        // New DbSets for Permissions
+        public DbSet<Permission> Permissions { get; set; }
+        public DbSet<UserPermission> UserPermissions { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -360,6 +366,43 @@ namespace SearchTool_ServerSide.Data
                     entity.HasKey(u => u.Id);
                     entity.HasIndex(u => u.Email).IsUnique(); // Required for .HasPrincipalKey
                 });
+         
+         // for permissions
+         //تعريف العلاقات والقواعد   
+         modelBuilder.Entity<Permission>(entity =>
+         {
+
+            entity.HasKey(p => p.Id); // Primary Key
+
+            entity.Property(p => p.Name) // Permission Name
+            .IsRequired()
+            .HasMaxLength(200);
+
+            entity.HasIndex(p => p.Name).IsUnique(); // Ensure unique permission names , we made it index for fast search
+
+            entity.Property(p => p.Description)
+            .HasMaxLength(1000);
+
+         });
+             // for userpermissions as up
+         modelBuilder.Entity<UserPermission>(entity =>
+         {
+
+            entity.HasKey(up => new { up.UserId, up.PermissionId }); // Composite Primary Key
+
+            entity.HasOne(up => up.User) // each UserPermission has one User
+            .WithMany(u => u.UserPermissions)   // each User has many UserPermissions
+            .HasForeignKey(up => up.UserId)    // Foreign Key
+            .OnDelete(DeleteBehavior.Cascade);  // When a User is deleted, delete related UserPermissions
+
+            entity.HasOne(up => up.Permission)   // each UserPermission has one Permission   
+            .WithMany(p => p.UserPermissions)    // each Permission has many UserPermissions
+            .HasForeignKey(up => up.PermissionId)  // Foreign Key
+            .OnDelete(DeleteBehavior.Cascade);    // When a Permission is deleted, delete related UserPermissions
+              
+        
+
+         });
             modelBuilder.Entity<OrderItem>(entity =>
             {
                 // DrugId → Drug.Id
