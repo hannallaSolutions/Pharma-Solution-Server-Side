@@ -31,7 +31,8 @@ namespace SearchTool_ServerSide.Data
         public DbSet<OrderItem> OrderItems { get; set; }
         public DbSet<Product> Products { get; set; }
 public DbSet<Permission> Permissions { get; set; }
-public DbSet<UserPermission> UserPermissions { get; set; }
+
+public DbSet<RolePermission> RolePermissions { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -141,8 +142,8 @@ public DbSet<UserPermission> UserPermissions { get; set; }
         public DbSet<DrugAlternativeReport> DrugAlternativeReports { get; set; }
         // New DbSets for Permissions
         public DbSet<Permission> Permissions { get; set; }
-        public DbSet<UserPermission> UserPermissions { get; set; }
-
+        public DbSet<RolePermission> RolePermissions { get; set; }
+  
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -369,22 +370,41 @@ public DbSet<UserPermission> UserPermissions { get; set; }
          
          // for permissions
          //تعريف العلاقات والقواعد   
+
          modelBuilder.Entity<Permission>(entity =>
-         {
+{
+    entity.ToTable("permissions");
 
-            entity.HasKey(p => p.Id); // Primary Key
+    entity.HasKey(p => p.Id);
 
-            entity.Property(p => p.Name) // Permission Name
-            .IsRequired()
-            .HasMaxLength(200);
+    entity.Property(p => p.Name)
+        .IsRequired()
+        .HasMaxLength(200);
 
-            entity.HasIndex(p => p.Name).IsUnique(); // Ensure unique permission names , we made it index for fast search
+    entity.HasIndex(p => p.Name).IsUnique();
 
-            entity.Property(p => p.Description)
-            .HasMaxLength(1000);
+    entity.Property(p => p.Description)
+        .HasMaxLength(1000);
+});
 
-         });
+modelBuilder.Entity<RolePermission>(entity =>
+{
+    entity.ToTable("role_permissions");
+
+    entity.HasKey(rp => new { rp.Role, rp.PermissionId }); // Composite Primary Key
+
+    entity.Property(rp => rp.Role)
+        .HasConversion<int>(); // enum -> int
+
+    entity.HasOne(rp => rp.Permission)
+        .WithMany(p => p.RolePermissions)
+        .HasForeignKey(rp => rp.PermissionId)
+        .OnDelete(DeleteBehavior.Cascade);
+});
+
+
              // for userpermissions as up
+       /*
          modelBuilder.Entity<UserPermission>(entity =>
          {
 
@@ -403,6 +423,8 @@ public DbSet<UserPermission> UserPermissions { get; set; }
         
 
          });
+*/
+         
             modelBuilder.Entity<OrderItem>(entity =>
             {
                 // DrugId → Drug.Id
@@ -412,6 +434,9 @@ public DbSet<UserPermission> UserPermissions { get; set; }
                     .HasPrincipalKey(e => e.NDC)
                     .OnDelete(DeleteBehavior.Restrict);
             });
+         
+     
+         
             modelBuilder.Entity<ScriptItem>(entity =>
             {
                 entity.HasOne(e => e.Prescriber)

@@ -12,7 +12,9 @@ namespace SearchTool_ServerSide.Models
         [MaxLength(1000)]
         public string ? Description { get; set; }
 
-          
-        public ICollection<UserPermission> UserPermissions { get; set; } = new List<UserPermission>();
+           // create navigation properties from Permission to RolePermission , this means each Permission can be linked to multiple RolePermissions
+          public ICollection<RolePermission> RolePermissions { get; set; } = new List<RolePermission>();
+
+    //    public ICollection<UserPermission> UserPermissions { get; set; } = new List<UserPermission>();
     }
 }

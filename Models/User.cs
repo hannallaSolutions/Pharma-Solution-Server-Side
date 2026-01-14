@@ -24,7 +24,7 @@ namespace SearchTool_ServerSide.Models
         public ICollection<Log> Logs { get; set; }
         public ICollection<SearchDrugDetailsLogs> SearchDrugDetailsLogs { get; set; } = new List<SearchDrugDetailsLogs>();
         // new part for permissions
-        public ICollection<UserPermission> UserPermissions { get; set; } = new List<UserPermission>();
+        // public ICollection<UserPermission> UserPermissions { get; set; } = new List<UserPermission>();
 
         public Branch Branch { get; set; }
         public Role Role { get; set; } = Role.Pharmacist;
