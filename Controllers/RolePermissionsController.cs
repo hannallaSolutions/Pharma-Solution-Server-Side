@@ -41,6 +41,7 @@ public class RolePermissionsController : ControllerBase
 
         var ids = dto.PermissionIds.Distinct().ToList();
 
+      // means if
         var existingIds = await _db.Permissions
             .Where(p => ids.Contains(p.Id))
             .Select(p => p.Id)

@@ -18,6 +18,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowReact", policy =>
     {
         policy.WithOrigins("http://localhost:5173",
+                       "http://localhost:5174",
                     "https://medi-beta-dev.brightpointsummit.com"
 
         )
@@ -33,9 +34,11 @@ builder.Services.AddCors(options =>
 //  JWT options
 var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>();
 if (jwtOptions == null)
+
 {
     throw new ArgumentNullException(nameof(jwtOptions));
 }
+
 builder.Services.AddSingleton(jwtOptions);
 
 //  Authorization policies
