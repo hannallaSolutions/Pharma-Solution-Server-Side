@@ -29,6 +29,10 @@ namespace SearchTool_ServerSide.Data
         public DbSet<SearchLog> SearchLogs { get; set; }
         public DbSet<Order> Orders { get; set; }
         public DbSet<OrderItem> OrderItems { get; set; }
+        public DbSet<Product> Products { get; set; }
+        public DbSet<Permission> Permissions { get; set; }
+
+        public DbSet<RolePermission> RolePermissions { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -125,6 +129,7 @@ namespace SearchTool_ServerSide.Data
         public DbSet<SearchLog> SearchLogs { get; set; }
         public DbSet<Order> Orders { get; set; }
         public DbSet<OrderItem> OrderItems { get; set; }
+        public DbSet<Product> Products { get; set; }
         public DbSet<DrugMedi> DrugMedis { get; set; }
         public DbSet<ClassType> ClassTypes { get; set; }
         public DbSet<SearchDrugDetailsLogs> DrugModals { get; set; }
@@ -137,17 +142,23 @@ namespace SearchTool_ServerSide.Data
         public DbSet<DrugAlternativeReport> DrugAlternativeReports { get; set; }
         public DbSet<DrugDiseaseAddHistory> DrugDiseaseAddHistories { get; set; }
         public DbSet<Disease> Diseases { get; set; }
+        public DbSet<Permission> Permissions { get; set; }
+        public DbSet<RolePermission> RolePermissions { get; set; }
+
+
+
+        // New DbSets for Permissions
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<DrugDiseaseAddHistory>(b =>
-            {
-                b.HasKey(dd => dd.Id);
-                b.HasIndex(dd => new { dd.DrugId, dd.DiseaseId, dd.UserId })
-                .IsUnique();
-               
-            });
-            
+{
+    b.HasKey(dd => dd.Id);
+    b.HasIndex(dd => new { dd.DrugId, dd.DiseaseId, dd.UserId })
+    .IsUnique();
+
+});
             base.OnModelCreating(modelBuilder);
             modelBuilder.Entity<InsuranceStatus>(b =>
       {
@@ -363,12 +374,73 @@ namespace SearchTool_ServerSide.Data
 
                 // UserEmail -> User.Email relationship
 
+                
+                // UserEmail -> User.Email relationship
+                
             });
             modelBuilder.Entity<User>(entity =>
                 {
                     entity.HasKey(u => u.Id);
                     entity.HasIndex(u => u.Email).IsUnique(); // Required for .HasPrincipalKey
                 });
+         
+         // for permissions
+         //تعريف العلاقات والقواعد   
+
+         modelBuilder.Entity<Permission>(entity =>
+{
+    entity.ToTable("permissions");
+
+    entity.HasKey(p => p.Id);
+
+    entity.Property(p => p.Name)
+        .IsRequired()
+        .HasMaxLength(200);
+
+    entity.HasIndex(p => p.Name).IsUnique();
+
+    entity.Property(p => p.Description)
+        .HasMaxLength(1000);
+});
+
+modelBuilder.Entity<RolePermission>(entity =>
+{
+    entity.ToTable("role_permissions");
+
+    entity.HasKey(rp => new { rp.Role, rp.PermissionId }); // Composite Primary Key
+
+    entity.Property(rp => rp.Role)
+        .HasConversion<int>(); // enum -> int
+
+    entity.HasOne(rp => rp.Permission)
+        .WithMany(p => p.RolePermissions)
+        .HasForeignKey(rp => rp.PermissionId)
+        .OnDelete(DeleteBehavior.Cascade);
+});
+
+
+             // for userpermissions as up
+       /*
+         modelBuilder.Entity<UserPermission>(entity =>
+         {
+
+            entity.HasKey(up => new { up.UserId, up.PermissionId }); // Composite Primary Key
+
+            entity.HasOne(up => up.User) // each UserPermission has one User
+            .WithMany(u => u.UserPermissions)   // each User has many UserPermissions
+            .HasForeignKey(up => up.UserId)    // Foreign Key
+            .OnDelete(DeleteBehavior.Cascade);  // When a User is deleted, delete related UserPermissions
+
+            entity.HasOne(up => up.Permission)   // each UserPermission has one Permission   
+            .WithMany(p => p.UserPermissions)    // each Permission has many UserPermissions
+            .HasForeignKey(up => up.PermissionId)  // Foreign Key
+            .OnDelete(DeleteBehavior.Cascade);    // When a Permission is deleted, delete related UserPermissions
+              
+        
+
+         });
+*/
+         
             modelBuilder.Entity<OrderItem>(entity =>
             {
                 // DrugId → Drug.Id
@@ -378,6 +450,9 @@ namespace SearchTool_ServerSide.Data
                     .HasPrincipalKey(e => e.NDC)
                     .OnDelete(DeleteBehavior.Restrict);
             });
+         
+     
+         
             modelBuilder.Entity<ScriptItem>(entity =>
             {
                 entity.HasOne(e => e.Prescriber)

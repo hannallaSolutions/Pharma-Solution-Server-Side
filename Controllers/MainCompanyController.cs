@@ -6,8 +6,12 @@ using SearchTool_ServerSide.Services;
 
 namespace SearchTool_ServerSide.Controllers
 {
-    [ApiController, Route("MainCompany")]
-    public class MainCompanyController(MainCompanyService _mainCompanyService) : ControllerBase
+
+[ApiController]
+[Route("MainCompany")]
+
+
+        public class MainCompanyController(MainCompanyService _mainCompanyService) : ControllerBase
     {
         [HttpGet("GetAllMainCompanies"), Authorize(Policy = "SuperAdmin")]
         public async Task<IActionResult> GetAllMainCompaniesAsync()
@@ -22,6 +26,8 @@ namespace SearchTool_ServerSide.Controllers
             var company = await _mainCompanyService.GetMainCompanyByIdAsync(id);
             return company != null ? Ok(company) : NotFound();
         }
+
+        
         [HttpPost("AddMainCompany"), Authorize(Policy = "SuperAdmin")]
         public async Task<IActionResult> AddMainCompanyAsync([FromBody]MainCompanyAddDto mainCompanyDto)
         {
@@ -35,4 +41,5 @@ namespace SearchTool_ServerSide.Controllers
         }
   
     }
+    
 }

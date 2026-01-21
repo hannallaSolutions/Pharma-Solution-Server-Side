@@ -2,6 +2,7 @@ using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using SearchTool_ServerSide.Data;
 using SearchTool_ServerSide.Models;
+using Npgsql;
 
 namespace SearchTool_ServerSide.Repository
 {
@@ -10,7 +11,7 @@ namespace SearchTool_ServerSide.Repository
         private readonly SearchToolDBContext _context;
         private readonly IMapper _mapper;
 
-        // ⚠️ Test-only key
+        // ⚠️ Not used now because Name column is TEXT (not encrypted)
         private readonly string encryptionKey = "test_key";
 
         public MainCompanyRepository(SearchToolDBContext context, IMapper mapper) : base(context)
@@ -26,14 +27,13 @@ namespace SearchTool_ServerSide.Repository
 
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-        INSERT INTO ""MainCompanies"" (""Name"", ""SpecialtyId"")
-        VALUES (pgp_sym_encrypt(@name, @key), @specialtyId)
-        RETURNING ""Id"", pgp_sym_decrypt(""Name"", @key) AS ""Name"", ""SpecialtyId"";
-    ";
+                INSERT INTO ""MainCompanies"" (""Name"", ""SpecialtyId"")
+                VALUES (@name, @specialtyId)
+                RETURNING ""Id"", ""Name"", ""SpecialtyId"";
+            ";
 
-            cmd.Parameters.Add(new Npgsql.NpgsqlParameter("@name", mainCompany.Name));
-            cmd.Parameters.Add(new Npgsql.NpgsqlParameter("@key", encryptionKey));
-            cmd.Parameters.Add(new Npgsql.NpgsqlParameter("@specialtyId", mainCompany.SpecialtyId));
+            cmd.Parameters.Add(new NpgsqlParameter("@name", mainCompany.Name));
+            cmd.Parameters.Add(new NpgsqlParameter("@specialtyId", mainCompany.SpecialtyId));
 
             await using var reader = await cmd.ExecuteReaderAsync();
 
@@ -50,28 +50,16 @@ namespace SearchTool_ServerSide.Repository
             return null;
         }
 
-
         internal async Task<IEnumerable<MainCompany>> GetAllMainCompaniesAsync()
         {
-            var companies = await _context.MainCompanies.ToListAsync();
-
-            return companies;
+            return await _context.MainCompanies.ToListAsync();
         }
 
         internal async Task<MainCompany?> GetMainCompanyByIdAsync(int id)
         {
-            var company = await _context.MainCompanies
-                .FromSqlRaw(@"
-                    SELECT ""Id"",
-                           pgp_sym_decrypt(""Name"", {0}) AS ""Name"",
-                           ""SpecialtyId""
-                    FROM ""MainCompanies""
-                    WHERE ""Id"" = {1}
-                ", encryptionKey, id)
-                .FirstOrDefaultAsync();
-
-            return company;
+            // ✅ Since Name is TEXT in DB, no decrypt needed
+            return await _context.MainCompanies
+                .FirstOrDefaultAsync(x => x.Id == id);
         }
     }
-
 }

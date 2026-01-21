@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SearchTool_ServerSide.Data;
@@ -11,9 +12,11 @@ using SearchTool_ServerSide.Data;
 namespace SearchTool_ServerSide.Migrations
 {
     [DbContext(typeof(SearchToolDBContext))]
-    partial class SearchToolDBContextModelSnapshot : ModelSnapshot
+    [Migration("20260104190541_InitProducts")]
+    partial class InitProducts
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -269,30 +272,6 @@ namespace SearchTool_ServerSide.Migrations
                         });
                 });
 
-            modelBuilder.Entity("SearchTool_ServerSide.Models.Disease", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<bool>("Show")
-                        .HasColumnType("boolean");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Diseases");
-                });
-
             modelBuilder.Entity("SearchTool_ServerSide.Models.Drug", b =>
                 {
                     b.Property<int>("Id")
@@ -460,44 +439,6 @@ namespace SearchTool_ServerSide.Migrations
                     b.HasIndex("ClassId");
 
                     b.ToTable("DrugClasses");
-                });
-
-            modelBuilder.Entity("SearchTool_ServerSide.Models.DrugDiseaseAddHistory", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("DiseaseId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("DrugId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("EditedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("Show")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DiseaseId");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("DrugId", "DiseaseId", "UserId")
-                        .IsUnique();
-
-                    b.ToTable("DrugDiseaseAddHistories");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.DrugInsurance", b =>
@@ -732,18 +673,6 @@ namespace SearchTool_ServerSide.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("NOW()");
 
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("DeviceInfo")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("IpAddress")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<string>("UserEmail")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -896,63 +825,6 @@ namespace SearchTool_ServerSide.Migrations
                     b.ToTable("OrderItems");
                 });
 
-            modelBuilder.Entity("SearchTool_ServerSide.Models.Permission", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Name")
-                        .IsUnique();
-
-                    b.ToTable("permissions", (string)null);
-                });
-
-            modelBuilder.Entity("SearchTool_ServerSide.Models.Product", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<decimal>("Price")
-                        .HasColumnType("numeric");
-
-                    b.Property<int>("Stock")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Products");
-                });
-
             modelBuilder.Entity("SearchTool_ServerSide.Models.QuestionEntry", b =>
                 {
                     b.Property<int>("Id")
@@ -1038,21 +910,6 @@ namespace SearchTool_ServerSide.Migrations
                     b.HasIndex("InsuranceRxId", "SourceDrugNDC", "TargetDrugNDC", "StatusDate");
 
                     b.ToTable("Reports");
-                });
-
-            modelBuilder.Entity("SearchTool_ServerSide.Models.RolePermission", b =>
-                {
-                    b.Property<int>("Role")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("PermissionId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Role", "PermissionId");
-
-                    b.HasIndex("PermissionId");
-
-                    b.ToTable("role_permissions", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.ScriptItem", b =>
@@ -1465,33 +1322,6 @@ namespace SearchTool_ServerSide.Migrations
                     b.Navigation("Drug");
                 });
 
-            modelBuilder.Entity("SearchTool_ServerSide.Models.DrugDiseaseAddHistory", b =>
-                {
-                    b.HasOne("SearchTool_ServerSide.Models.Disease", "Disease")
-                        .WithMany()
-                        .HasForeignKey("DiseaseId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SearchTool_ServerSide.Models.Drug", "Drug")
-                        .WithMany()
-                        .HasForeignKey("DrugId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SearchTool_ServerSide.Models.User", "User")
-                        .WithMany("DrugDiseaseAddHistories")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Disease");
-
-                    b.Navigation("Drug");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("SearchTool_ServerSide.Models.DrugInsurance", b =>
                 {
                     b.HasOne("SearchTool_ServerSide.Models.Branch", "Branch")
@@ -1663,17 +1493,6 @@ namespace SearchTool_ServerSide.Migrations
                     b.Navigation("InsuranceStatus");
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("SearchTool_ServerSide.Models.RolePermission", b =>
-                {
-                    b.HasOne("SearchTool_ServerSide.Models.Permission", "Permission")
-                        .WithMany("RolePermissions")
-                        .HasForeignKey("PermissionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Permission");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.ScriptItem", b =>
@@ -1879,11 +1698,6 @@ namespace SearchTool_ServerSide.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("SearchTool_ServerSide.Models.Permission", b =>
-                {
-                    b.Navigation("RolePermissions");
-                });
-
             modelBuilder.Entity("SearchTool_ServerSide.Models.SectionEntry", b =>
                 {
                     b.Navigation("Questions");
@@ -1896,8 +1710,6 @@ namespace SearchTool_ServerSide.Migrations
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.User", b =>
                 {
-                    b.Navigation("DrugDiseaseAddHistories");
-
                     b.Navigation("Logs");
 
                     b.Navigation("SearchDrugDetailsLogs");
