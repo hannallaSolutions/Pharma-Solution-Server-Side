@@ -135,8 +135,19 @@ namespace SearchTool_ServerSide.Data
         public DbSet<Report> Reports { get; set; }
         public DbSet<DrugAlternativeStatus> DrugAlternativeStatuses { get; set; }
         public DbSet<DrugAlternativeReport> DrugAlternativeReports { get; set; }
+        public DbSet<DrugDiseaseAddHistory> DrugDiseaseAddHistories { get; set; }
+        public DbSet<Disease> Diseases { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            modelBuilder.Entity<DrugDiseaseAddHistory>(b =>
+            {
+                b.HasKey(dd => dd.Id);
+                b.HasIndex(dd => new { dd.DrugId, dd.DiseaseId, dd.UserId })
+                .IsUnique();
+               
+            });
+            
             base.OnModelCreating(modelBuilder);
             modelBuilder.Entity<InsuranceStatus>(b =>
       {
@@ -349,9 +360,9 @@ namespace SearchTool_ServerSide.Data
                 entity.Property(e => e.TotalInsurancePay).HasColumnType("decimal(18,2)");
                 entity.Property(e => e.TotalAcquisitionCost).HasColumnType("decimal(18,2)");
                 entity.Property(e => e.AddtionalCost).HasColumnType("decimal(18,2)");
-                
+
                 // UserEmail -> User.Email relationship
-                
+
             });
             modelBuilder.Entity<User>(entity =>
                 {

@@ -22,7 +22,7 @@ namespace SearchTool_ServerSide.Models
         public int BranchId { get; set; }
         public ICollection<Log> Logs { get; set; }
         public ICollection<SearchDrugDetailsLogs> SearchDrugDetailsLogs { get; set; } = new List<SearchDrugDetailsLogs>();
-
+        public ICollection<DrugDiseaseAddHistory> DrugDiseaseAddHistories { get; set; } = new List<DrugDiseaseAddHistory>();
         public Branch Branch { get; set; }
         public Role Role { get; set; } = Role.Pharmacist;
 

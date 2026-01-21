@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SearchTool_ServerSide.Data;
@@ -11,9 +12,11 @@ using SearchTool_ServerSide.Data;
 namespace SearchTool_ServerSide.Migrations
 {
     [DbContext(typeof(SearchToolDBContext))]
-    partial class SearchToolDBContextModelSnapshot : ModelSnapshot
+    [Migration("20260112224502_switchtodrugdieseasehistory")]
+    partial class switchtodrugdieseasehistory
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -485,17 +488,21 @@ namespace SearchTool_ServerSide.Migrations
                     b.Property<bool>("Show")
                         .HasColumnType("boolean");
 
-                    b.Property<int>("UserId")
+                    b.Property<int?>("UserId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("UserId1")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
 
                     b.HasIndex("DiseaseId");
 
+                    b.HasIndex("DrugId");
+
                     b.HasIndex("UserId");
 
-                    b.HasIndex("DrugId", "DiseaseId", "UserId")
-                        .IsUnique();
+                    b.HasIndex("UserId1");
 
                     b.ToTable("DrugDiseaseAddHistories");
                 });
@@ -1408,10 +1415,13 @@ namespace SearchTool_ServerSide.Migrations
                         .IsRequired();
 
                     b.HasOne("SearchTool_ServerSide.Models.User", "User")
-                        .WithMany("DrugDiseaseAddHistories")
+                        .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SearchTool_ServerSide.Models.User", null)
+                        .WithMany("DrugDiseaseAddHistories")
+                        .HasForeignKey("UserId1");
 
                     b.Navigation("Disease");
 

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SearchTool_ServerSide.Data;
@@ -11,9 +12,11 @@ using SearchTool_ServerSide.Data;
 namespace SearchTool_ServerSide.Migrations
 {
     [DbContext(typeof(SearchToolDBContext))]
-    partial class SearchToolDBContextModelSnapshot : ModelSnapshot
+    [Migration("20260104223118_logpdate")]
+    partial class logpdate
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -462,7 +465,7 @@ namespace SearchTool_ServerSide.Migrations
                     b.ToTable("DrugClasses");
                 });
 
-            modelBuilder.Entity("SearchTool_ServerSide.Models.DrugDiseaseAddHistory", b =>
+            modelBuilder.Entity("SearchTool_ServerSide.Models.DrugDisease", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -479,23 +482,50 @@ namespace SearchTool_ServerSide.Migrations
                     b.Property<int>("DrugId")
                         .HasColumnType("integer");
 
-                    b.Property<DateTime>("EditedAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<bool>("Show")
                         .HasColumnType("boolean");
 
-                    b.Property<int>("UserId")
-                        .HasColumnType("integer");
+                    b.Property<string>("userEmail")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
                     b.HasIndex("DiseaseId");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("DrugId");
 
-                    b.HasIndex("DrugId", "DiseaseId", "UserId")
-                        .IsUnique();
+                    b.HasIndex("userEmail");
+
+                    b.ToTable("DrugDiseases");
+                });
+
+            modelBuilder.Entity("SearchTool_ServerSide.Models.DrugDiseaseAddHistory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("DrugDiseaseId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("Show")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("UserEmail")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DrugDiseaseId");
+
+                    b.HasIndex("UserEmail");
 
                     b.ToTable("DrugDiseaseAddHistories");
                 });
@@ -1393,7 +1423,7 @@ namespace SearchTool_ServerSide.Migrations
                     b.Navigation("Drug");
                 });
 
-            modelBuilder.Entity("SearchTool_ServerSide.Models.DrugDiseaseAddHistory", b =>
+            modelBuilder.Entity("SearchTool_ServerSide.Models.DrugDisease", b =>
                 {
                     b.HasOne("SearchTool_ServerSide.Models.Disease", "Disease")
                         .WithMany()
@@ -1408,14 +1438,35 @@ namespace SearchTool_ServerSide.Migrations
                         .IsRequired();
 
                     b.HasOne("SearchTool_ServerSide.Models.User", "User")
-                        .WithMany("DrugDiseaseAddHistories")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .WithMany()
+                        .HasForeignKey("userEmail")
+                        .HasPrincipalKey("Email")
+                        .OnDelete(DeleteBehavior.SetNull)
                         .IsRequired();
 
                     b.Navigation("Disease");
 
                     b.Navigation("Drug");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("SearchTool_ServerSide.Models.DrugDiseaseAddHistory", b =>
+                {
+                    b.HasOne("SearchTool_ServerSide.Models.DrugDisease", "DrugDisease")
+                        .WithMany("DrugDiseaseAddHistories")
+                        .HasForeignKey("DrugDiseaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SearchTool_ServerSide.Models.User", "User")
+                        .WithMany("DrugDiseaseAddHistories")
+                        .HasForeignKey("UserEmail")
+                        .HasPrincipalKey("Email")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("DrugDisease");
 
                     b.Navigation("User");
                 });
@@ -1758,6 +1809,11 @@ namespace SearchTool_ServerSide.Migrations
             modelBuilder.Entity("SearchTool_ServerSide.Models.DrugAlternativeStatus", b =>
                 {
                     b.Navigation("Reports");
+                });
+
+            modelBuilder.Entity("SearchTool_ServerSide.Models.DrugDisease", b =>
+                {
+                    b.Navigation("DrugDiseaseAddHistories");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.FeedbackFormEntry", b =>

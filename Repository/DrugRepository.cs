@@ -5945,7 +5945,36 @@ LIMIT {pageSize} OFFSET {offset};";
 
             return drugs;
         }
+        internal async Task<IEnumerable<DrugReadDto>> GetDrugs(int pageNumber, int pageSize)
+        {
+            pageNumber = pageNumber > 0 ? pageNumber : 1;
+            pageSize = pageSize > 0 ? pageSize : 10;
 
+            var drugs = await _context.Drugs
+                .OrderBy(d => d.Id)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .Select(d => new DrugReadDto
+                {
+                    Name = d.Name,
+                    NDC = d.NDC,
+                    Form = d.Form,
+                    Strength = d.Strength,
+                    ACQ = d.ACQ,
+                    AWP = d.AWP,
+                    Rxcui = d.Rxcui ?? 0,
+                    Route = d.Route,
+                    TECode = d.TECode,
+                    Ingrdient = d.Ingrdient,
+                    ApplicationNumber = d.ApplicationNumber,
+                    ApplicationType = d.ApplicationType,
+                    StrengthUnit = d.StrengthUnit,
+                    Type = d.Type
+                })
+                .ToListAsync();
+
+            return drugs;
+        }
     }
     // public sealed class InsuranceMap : ClassMap<Insurance>
     // {

@@ -6,6 +6,7 @@ using Microsoft.IdentityModel.Tokens;
 using SearchTool_ServerSide.Authentication;
 using SearchTool_ServerSide.Data;
 using SearchTool_ServerSide.Middleware;
+using SearchTool_ServerSide.Models;
 using SearchTool_ServerSide.Repository;
 using SearchTool_ServerSide.Services;
 using ServerSide;
@@ -24,7 +25,9 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("Admin",
     builder => { builder.RequireRole("Admin", "SuperAdmin"); });
     options.AddPolicy("Pharmacist",
-    builder => { builder.RequireRole("Pharmacist", "Admin", "SuperAdmin","Doctor"); });
+    builder => { builder.RequireRole("Pharmacist", "Admin", "SuperAdmin", "Doctor"); });
+    options.AddPolicy("Doctor",
+    builder => { builder.RequireRole("Pharmacist", "Admin", "SuperAdmin", "Doctor"); });
 
 });
 
@@ -51,7 +54,7 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
-
+//////////////////////////////////////////////
 builder.Services.AddScoped<UserAccessToken>();
 builder.Services.AddScoped(typeof(IRepository<>), typeof(GenericRepository<>));
 builder.Services.AddScoped<DrugRepository>();
@@ -66,6 +69,7 @@ builder.Services.AddScoped<NadacRepository>();
 builder.Services.AddScoped<MainCompanyRepository>();
 builder.Services.AddScoped<DrugClassRepository>();
 builder.Services.AddScoped<BranchRepository>();
+builder.Services.AddScoped<DiseaseRepository>();
 //////////////////////////////////////////////
 builder.Services.AddScoped<NadacService>();
 builder.Services.AddScoped<OrderService>();
@@ -78,6 +82,8 @@ builder.Services.AddScoped<MainCompanyService>();
 builder.Services.AddScoped<FeedbackService>();
 builder.Services.AddScoped<DrugClassService>();
 builder.Services.AddScoped<BranchService>();
+builder.Services.AddScoped<DiseaseService>();
+//////////////////////////////////////////////
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddControllers();
@@ -86,29 +92,29 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddMemoryCache();
 
 
-// var allowedOrigins = new List<string>
-// {
-//     "https://medisearchtool.com",
-//     "https://pharmacy.medisearchtool.com",
-//     "https://medi-dev-test.hanna-west.com",
-//     "https://medi-beta-dev.brightpointsummit.com",
-//     "http://medi-beta-dev.brightpointsummit.com",
-//     "http://localhost:5173",
-//         "http://localhost:5174",
-//         "http://127.0.0.1:8000",
+var allowedOrigins = new List<string>
+{
+    "https://medisearchtool.com",
+    "https://pharmacy.medisearchtool.com",
+    "https://medi-dev-test.hanna-west.com",
+    "https://medi-beta-dev.brightpointsummit.com",
+    "http://medi-beta-dev.brightpointsummit.com",
+    "http://localhost:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:8000",
 
-// };
+};
 
-// builder.Services.AddCors(options =>
-// {
-//     options.AddPolicy("CorsPolicy", policy =>
-//     {
-//         policy.WithOrigins(allowedOrigins.ToArray())
-//               .AllowCredentials()
-//               .AllowAnyHeader()
-//               .AllowAnyMethod();
-//     });
-// });
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("CorsPolicy", policy =>
+    {
+        policy.WithOrigins(allowedOrigins.ToArray())
+              .AllowCredentials()
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
 
 
 
