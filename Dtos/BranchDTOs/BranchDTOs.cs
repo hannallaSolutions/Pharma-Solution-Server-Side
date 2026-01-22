@@ -35,4 +35,6 @@ public class BranchDto
     public string MainCompanyName { get; set; }
 }
 
+
+
 }

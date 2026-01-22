@@ -104,6 +104,20 @@ public class SpecialtyController : ControllerBase
 
 }
 
+
+// GET /api/Specialty/withCompaniesCount
+[HttpGet("withCompaniesCount")]
+public async Task<IActionResult> withCompaniesCount()
+{
+    var data = await _Context.Specialties
+    .Select( s => new{
+        specialtyId = s.Id,
+        name = s.Name,
+        companiesCount = _Context.MainCompanies.Count( m => m.SpecialtyId == s.Id)
+    })
+    .ToListAsync();
+    return Ok(data);
+}
 }
 
 }

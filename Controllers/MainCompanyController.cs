@@ -1,8 +1,11 @@
+
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SearchTool_ServerSide.Dtos.MainCompanyDtos;
 using SearchTool_ServerSide.Models;
 using SearchTool_ServerSide.Services;
+using SearchTool_ServerSide.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace SearchTool_ServerSide.Controllers
 {
@@ -11,8 +14,18 @@ namespace SearchTool_ServerSide.Controllers
 [Route("MainCompany")]
 
 
-        public class MainCompanyController(MainCompanyService _mainCompanyService) : ControllerBase
+        public class MainCompanyController : ControllerBase
     {
+
+        private readonly MainCompanyService _mainCompanyService;
+        private readonly SearchToolDBContext _context;
+
+        public MainCompanyController(MainCompanyService mainCompanyService, SearchToolDBContext context)
+        {
+            _mainCompanyService = mainCompanyService;
+            _context = context;
+        }
+
         [HttpGet("GetAllMainCompanies"), Authorize(Policy = "SuperAdmin")]
         public async Task<IActionResult> GetAllMainCompaniesAsync()
         {
@@ -40,6 +53,23 @@ namespace SearchTool_ServerSide.Controllers
             return Ok(addedCompany);
         }
   
+
+        //GET /MainCompany/GetMainCompaniesWithBranchesCount
+        [HttpGet("GetMainCompaniesWithBranchesCount")]
+        public async Task<IActionResult> GetMainCompaniesWithBranchesCount()
+        {
+            var data = await  _context.MainCompanies
+            .Select( m => new
+            {
+                mainCompanyId = m.Id,
+                name = m.Name ,
+                branchesCount = _context.Branches.Count( b => b.MainCompanyId == m.Id)
+            }
+
+            )
+            .ToListAsync();
+            return Ok(data);
+        }
     }
     
 }
