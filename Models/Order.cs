@@ -14,7 +14,6 @@ namespace SearchTool_ServerSide.Models
         public decimal TotalInsurancePay { get; set; }
         public decimal TotalAcquisitionCost { get; set; }
         public decimal AddtionalCost { get; set; }
-        
         public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
 
     }

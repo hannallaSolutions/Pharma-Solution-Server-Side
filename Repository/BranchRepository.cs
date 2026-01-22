@@ -8,8 +8,8 @@ namespace SearchTool_ServerSide.Repository
 {
     public class BranchRepository : GenericRepository<Branch>
     {
-        private readonly SearchToolDBContext _context;
-        private readonly IMapper _mapper;
+        private readonly SearchToolDBContext _context;  //to read from database
+        private readonly IMapper _mapper; // to map between entities and DTOs
         public BranchRepository(SearchToolDBContext context, IMapper mapper) : base(context)
         {
             _context = context;

@@ -13,6 +13,5 @@ namespace SearchTool_ServerSide.Models
         public User User { get; set; }
         public Drug Drug { get; set; }
         public Disease Disease { get; set; }
-        public ICollection<DrugDiseaseAddHistory> DrugDiseaseAddHistories { get; set; } = new List<DrugDiseaseAddHistory>();
     }
 }

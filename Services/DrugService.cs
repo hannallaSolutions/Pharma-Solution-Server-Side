@@ -335,10 +335,5 @@ namespace SearchTool_ServerSide.Services
             var items = await _drugRepository.GetAllDrugsForSuperAdminAsync(pageNumber, pageSize);
             return items;
         }
-        internal async Task<IEnumerable<DrugReadDto>> GetDrugs(int pageNumber = 1, int pageSize = 20)
-        {
-            var items = await _drugRepository.GetDrugs(pageNumber, pageSize);
-            return items;
-        }
     }
 }
