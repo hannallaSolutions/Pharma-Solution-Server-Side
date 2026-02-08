@@ -1,6 +1,6 @@
 namespace SearchTool_ServerSide.Models
 {
-    public class Disease
+    public class Disease : ServerSide.Model.IEntity
     {
         public int Id { get; set; }
         public string Name { get; set; }

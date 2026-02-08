@@ -33,6 +33,7 @@ namespace SearchTool_ServerSide.Data
         public DbSet<Permission> Permissions { get; set; }
 
         public DbSet<RolePermission> RolePermissions { get; set; }
+        
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -141,6 +142,8 @@ namespace SearchTool_ServerSide.Data
         public DbSet<DrugAlternativeStatus> DrugAlternativeStatuses { get; set; }
         public DbSet<DrugAlternativeReport> DrugAlternativeReports { get; set; }
         public DbSet<DrugDiseaseAddHistory> DrugDiseaseAddHistories { get; set; }
+        
+        public DbSet<DrugDisease> DrugDiseases { get; set; }
         public DbSet<Disease> Diseases { get; set; }
         public DbSet<Permission> Permissions { get; set; }
         public DbSet<RolePermission> RolePermissions { get; set; }
@@ -152,6 +155,18 @@ namespace SearchTool_ServerSide.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            //for drugdisease
+           
+            modelBuilder.Entity<DrugDisease>()
+            .HasOne(dd => dd.Disease)
+            .WithMany()
+            .HasForeignKey(dd => dd.DiseaseId);
+
+          // Add index for disease name filtering
+             modelBuilder.Entity<Disease>()
+            .HasIndex(d => d.Name);
+
+
             modelBuilder.Entity<DrugDiseaseAddHistory>(b =>
 {
     b.HasKey(dd => dd.Id);

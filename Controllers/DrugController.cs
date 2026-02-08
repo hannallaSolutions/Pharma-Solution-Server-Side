@@ -349,10 +349,13 @@ namespace SearchTool_ServerSide.Controllers
             [FromQuery] int pageSize = 10,
             [FromQuery] string? rxgroup = null,
             [FromQuery] string? pcn = null,
-            [FromQuery] string? bin = null)
+            [FromQuery] string? bin = null,
+            [FromQuery] string? diseaseName = null
+            )
         {
             var items = await _drugService.GetAlternativesWithInsurance(
-                classInfoId, sourceDrugNDC, sourceRxGroupId, matchedRx, pageNumber, pageSize, rxgroup, pcn, bin);
+                classInfoId, sourceDrugNDC, sourceRxGroupId, matchedRx, pageNumber,
+                 pageSize, rxgroup, pcn, bin, diseaseName);
             return Ok(items);
         }
         [HttpGet("GetAlternativesWithInsuranceFilters"), AllowAnonymous]

@@ -298,9 +298,11 @@ namespace SearchTool_ServerSide.Services
         int pageSize = 10,
         string? rxgroup = null,
         string? pcn = null,
-        string? bin = null)
+        string? bin = null,
+        string? diseaseName = null)
         {
-            return await _drugRepository.GetAlternativesWithInsurance(classInfoId, sourceDrugNDC, sourceRxGroupId, matchedRx, pageNumber, pageSize, rxgroup, pcn, bin);
+            return await _drugRepository.GetAlternativesWithInsurance(classInfoId, 
+            sourceDrugNDC, sourceRxGroupId, matchedRx, pageNumber, pageSize, rxgroup, pcn, bin, diseaseName);
         }
         internal async Task<AlternativesFilterOptionsDto> GetAlternativesWithInsuranceFilters(int classInfoId, string sourceDrugNDC, string? rxgroup = null, string? pcn = null, string? bin = null)
         {
