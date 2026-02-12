@@ -7,5 +7,7 @@ namespace SearchTool_ServerSide.Models
         public string Description { get; set; }
         public bool Show { get; set; }
 
+     
+
     }
 }

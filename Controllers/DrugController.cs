@@ -411,5 +411,7 @@ namespace SearchTool_ServerSide.Controllers
             var items = await _drugService.GetAllDrugsForSuperAdminAsync(pageNumber, pageSize);
             return Ok(items);
         }
+
+        
     }
 }

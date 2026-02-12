@@ -4101,31 +4101,6 @@ public async Task<PagedResult<DrugsAlternativesReadDto>> GetAlternativesWithInsu
                               && x.InsuranceRx.InsurancePCN.Insurance != null
                               && x.InsuranceRx.InsurancePCN.Insurance.Bin == bin);
 
-    // ========== DISEASE FILTER (APPLIED BEFORE ToListAsync) ==========
-    // Recommended approach: get DrugIds for the disease, then filter query using Contains.
- /*
-    if (!string.IsNullOrWhiteSpace(diseaseName))
-    {
-        var dn = diseaseName.Trim().ToLower();
-
-        var diseaseDrugIds = await _context.DrugDiseases
-            .AsNoTracking()
-            .Where(dd =>
-                dd.Show == true &&
-                dd.Disease != null &&
-                dd.Disease.Name != null &&
-                dd.Disease.Name.ToLower() == dn
-            )
-            .Select(dd => dd.DrugId)
-            .Distinct()
-            .ToListAsync();
-
-        if (diseaseDrugIds.Count == 0)
-            return EmptyPage(pageNumber, pageSize);
-
-        query = query.Where(x => diseaseDrugIds.Contains(x.Drug.Id));
-    }
-*/
 
 if (!string.IsNullOrWhiteSpace(diseaseName))
 {
@@ -4811,6 +4786,9 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
                 .ToList();
 
             return pagedData;
+
+       
+
         }
 
         private async Task<List<AuditReadDto>> GetAuditDtosWithBestBeforeOrPrevMonthAsync(string classTypeName, string matchOn)

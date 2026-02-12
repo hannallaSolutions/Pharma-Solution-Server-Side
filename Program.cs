@@ -83,6 +83,9 @@ builder.Services.AddScoped<FeedbackService>();
 builder.Services.AddScoped<DrugClassService>();
 builder.Services.AddScoped<BranchService>();
 builder.Services.AddScoped<DiseaseService>();
+builder.Services.AddScoped<ScriptsRepository>();
+builder.Services.AddScoped<ScriptsService>();
+
 //////////////////////////////////////////////
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
