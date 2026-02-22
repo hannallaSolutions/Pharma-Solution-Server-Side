@@ -408,6 +408,7 @@ namespace SearchTool_ServerSide.Controllers
             var items = await _drugService.GetAllDrugsForSuperAdminAsync(pageNumber, pageSize);
             return Ok(items);
         }
+        [HttpGet("GetDrugs")]
         public async Task<IActionResult> GetDrugs([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20)
         {
             var items = await _drugService.GetDrugs(pageNumber, pageSize);
