@@ -10,7 +10,7 @@ using ServerSide;
 
 namespace SearchTool_ServerSide.Services
 {
-    public class UserSevice(IHttpContextAccessor httpContext,UserRepository _userRepository, IMapper _mapper, JwtOptions jwtOptions, BranchRepository _branchRepository, LogRepository _logRepository)
+    public class UserSevice(UserRepository _userRepository, IMapper _mapper, JwtOptions jwtOptions, BranchRepository _branchRepository, LogRepository _logRepository)
     {
         internal async Task<UserReadDto> Register(UserAddDto userAddDto)
         {
@@ -36,20 +36,15 @@ namespace SearchTool_ServerSide.Services
             {
                 return null;
             }
-            var mainCompany = await _branchRepository.GetMainCompanyByBranchId(user.BranchId);
+            var mainCompany = await _branchRepository.GetMainCompanyByBranchId(user.BranchId); 
             if (!BCrypt.Net.BCrypt.Verify(userLoginDto.Password, user.Password))
             {
                 return null;
             }
-            string deviceInfo = httpContext.HttpContext.Request.Headers["User-Agent"].ToString();
-            string ipAddress = httpContext.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
             var log = new Log
             {
                 UserEmail = user.Email,
                 Date = DateTime.UtcNow,
-                Description = "User Login",
-                DeviceInfo = deviceInfo,
-                IpAddress = ipAddress,
                 Action = "Login",
             };
             await _logRepository.Add(log);

@@ -41,8 +41,7 @@ namespace SearchTool_ServerSide.Middleware
             {
                 userId = parsedUserId;
             }
-            var IpAddress = context.Connection.RemoteIpAddress?.ToString();
-            var deviceInfo = context.Request.Headers["User-Agent"].ToString();
+
             // Process the request first
             await _next(context);
             // Console.WriteLine("here");
@@ -57,7 +56,7 @@ namespace SearchTool_ServerSide.Middleware
                 {
                     return;
                 }
-                _logger.LogInformation($"User: {userId.Value} requested {requestPath} with {method} method and got {responseStatus} response status. with IP: {IpAddress} and Device Info: {deviceInfo}");
+                _logger.LogInformation($"User: {userId.Value} requested {requestPath} with {method} method and got {responseStatus} response");
                 // Save the log to the database
                 using (var scope = _scopeFactory.CreateScope())
                 {
@@ -72,10 +71,7 @@ namespace SearchTool_ServerSide.Middleware
                     {
                         UserEmail = user.Email,
                         Date = DateTime.UtcNow,
-                        IpAddress = IpAddress,
-                        DeviceInfo = deviceInfo,
-                        Description = "User requested " + endpointName,
-                        Action = "User requested " + endpointName
+                        Action = "User requested " + endpointName 
                     };
 
                     dbContext.Logs.Add(log);

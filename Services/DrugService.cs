@@ -298,9 +298,11 @@ namespace SearchTool_ServerSide.Services
         int pageSize = 10,
         string? rxgroup = null,
         string? pcn = null,
-        string? bin = null)
+        string? bin = null,
+        string? diseaseName = null)
         {
-            return await _drugRepository.GetAlternativesWithInsurance(classInfoId, sourceDrugNDC, sourceRxGroupId, matchedRx, pageNumber, pageSize, rxgroup, pcn, bin);
+            return await _drugRepository.GetAlternativesWithInsurance(classInfoId, 
+            sourceDrugNDC, sourceRxGroupId, matchedRx, pageNumber, pageSize, rxgroup, pcn, bin, diseaseName);
         }
         internal async Task<AlternativesFilterOptionsDto> GetAlternativesWithInsuranceFilters(int classInfoId, string sourceDrugNDC, string? rxgroup = null, string? pcn = null, string? bin = null)
         {
@@ -333,11 +335,6 @@ namespace SearchTool_ServerSide.Services
         internal async Task<ICollection<SuperAdminDrugReadDto>> GetAllDrugsForSuperAdminAsync(int pageNumber = 1, int pageSize = 20)
         {
             var items = await _drugRepository.GetAllDrugsForSuperAdminAsync(pageNumber, pageSize);
-            return items;
-        }
-        internal async Task<IEnumerable<DrugReadDto>> GetDrugs(int pageNumber = 1, int pageSize = 20)
-        {
-            var items = await _drugRepository.GetDrugs(pageNumber, pageSize);
             return items;
         }
     }

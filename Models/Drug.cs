@@ -1,5 +1,4 @@
 using ServerSide.Model;
-
 namespace SearchTool_ServerSide.Models
 {
     public class Drug : IEntity
@@ -21,5 +20,7 @@ namespace SearchTool_ServerSide.Models
         public string? ApplicationType { get; set; }
         public string? StrengthUnit { get; set; }
         public string? Type { get; set; }
+
+
     }
 }
