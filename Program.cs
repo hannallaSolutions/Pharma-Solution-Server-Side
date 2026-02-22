@@ -92,6 +92,8 @@ builder.Services.AddHttpClient<IGeminiChatService, GeminiChatService>(client =>
 {
     client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
 });
+builder.Services.AddScoped<ScriptsRepository>();
+builder.Services.AddScoped<ScriptsService>();
 
 //////////////////////////////////////////////
 builder.Services.AddSwaggerGen();

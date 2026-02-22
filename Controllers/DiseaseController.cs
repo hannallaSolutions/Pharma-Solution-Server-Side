@@ -70,5 +70,14 @@ namespace SearchTool_ServerSide.Controllers
             }
             return Ok();
         }
+
+/*
+        [HttpGet("GetAllDrugDiseasesByDrugId")]
+public async Task<IActionResult> GetAllDrugDiseasesByDrugId([FromQuery] int id)
+{
+    var data = await diseaseService.GetAllDrugDiseasesByDrugIdAsync(id);
+    return Ok(data);
+}*/
+
     }
 }

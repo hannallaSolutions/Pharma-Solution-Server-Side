@@ -349,10 +349,13 @@ namespace SearchTool_ServerSide.Controllers
             [FromQuery] int pageSize = 10,
             [FromQuery] string? rxgroup = null,
             [FromQuery] string? pcn = null,
-            [FromQuery] string? bin = null)
+            [FromQuery] string? bin = null,
+            [FromQuery] string? diseaseName = null
+            )
         {
             var items = await _drugService.GetAlternativesWithInsurance(
-                classInfoId, sourceDrugNDC, sourceRxGroupId, matchedRx, pageNumber, pageSize, rxgroup, pcn, bin);
+                classInfoId, sourceDrugNDC, sourceRxGroupId, matchedRx, pageNumber,
+                 pageSize, rxgroup, pcn, bin, diseaseName);
             return Ok(items);
         }
         [HttpGet("GetAlternativesWithInsuranceFilters"), AllowAnonymous]
@@ -408,11 +411,7 @@ namespace SearchTool_ServerSide.Controllers
             var items = await _drugService.GetAllDrugsForSuperAdminAsync(pageNumber, pageSize);
             return Ok(items);
         }
-        [HttpGet("GetDrugs")]
-        public async Task<IActionResult> GetDrugs([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20)
-        {
-            var items = await _drugService.GetDrugs(pageNumber, pageSize);
-            return Ok(items);
-        }
+
+        
     }
 }
