@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SearchTool_ServerSide.Data;
@@ -11,9 +12,11 @@ using SearchTool_ServerSide.Data;
 namespace SearchTool_ServerSide.Migrations
 {
     [DbContext(typeof(SearchToolDBContext))]
-    partial class SearchToolDBContextModelSnapshot : ModelSnapshot
+    [Migration("20260215171643_AddDiseaseVisibilitySettings")]
+    partial class AddDiseaseVisibilitySettings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -321,7 +324,7 @@ namespace SearchTool_ServerSide.Migrations
                         {
                             Id = 1,
                             Mode = 1,
-                            UpdatedAt = new DateTime(2026, 2, 15, 18, 46, 3, 289, DateTimeKind.Utc).AddTicks(7273)
+                            UpdatedAt = new DateTime(2026, 2, 15, 17, 16, 35, 488, DateTimeKind.Utc).AddTicks(2117)
                         });
                 });
 
@@ -1339,30 +1342,6 @@ namespace SearchTool_ServerSide.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("SearchTool_ServerSide.Models.UserDiseaseVisibility", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("DiseaseId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DiseaseId");
-
-                    b.HasIndex("UserId", "DiseaseId")
-                        .IsUnique();
-
-                    b.ToTable("UserDiseaseVisibility");
-                });
-
             modelBuilder.Entity("ServerSide.Models.Script", b =>
                 {
                     b.Property<int>("Id")
@@ -1904,25 +1883,6 @@ namespace SearchTool_ServerSide.Migrations
                         .IsRequired();
 
                     b.Navigation("Branch");
-                });
-
-            modelBuilder.Entity("SearchTool_ServerSide.Models.UserDiseaseVisibility", b =>
-                {
-                    b.HasOne("SearchTool_ServerSide.Models.Disease", "Disease")
-                        .WithMany()
-                        .HasForeignKey("DiseaseId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SearchTool_ServerSide.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Disease");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("ServerSide.Models.Script", b =>

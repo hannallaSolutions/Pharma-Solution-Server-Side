@@ -145,6 +145,9 @@ namespace SearchTool_ServerSide.Data
         
         public DbSet<DrugDisease> DrugDiseases { get; set; }
         public DbSet<Disease> Diseases { get; set; }
+public DbSet<DiseaseVisibilitySettings> DiseaseVisibilitySettings { get; set; }
+public DbSet<UserDiseaseVisibility> UserDiseaseVisibility { get; set; }
+
         public DbSet<Permission> Permissions { get; set; }
         public DbSet<RolePermission> RolePermissions { get; set; }
 
@@ -155,6 +158,36 @@ namespace SearchTool_ServerSide.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+
+          
+    base.OnModelCreating(modelBuilder);
+
+    modelBuilder.Entity<DiseaseVisibilitySettings>().HasData(new DiseaseVisibilitySettings
+    {
+        Id = 1,
+        Mode = SearchTool_ServerSide.Models.Enums.DiseaseVisibilityMode.AllDoctors,
+        UpdatedAt = DateTime.UtcNow,
+        UpdatedByUserId = null
+    });
+
+
+modelBuilder.Entity<UserDiseaseVisibility>()
+    .HasIndex(x => new { x.UserId, x.DiseaseId })
+    .IsUnique();
+
+modelBuilder.Entity<UserDiseaseVisibility>()
+    .HasOne(x => x.User)
+    .WithMany()
+    .HasForeignKey(x => x.UserId)
+    .OnDelete(DeleteBehavior.Cascade);
+
+modelBuilder.Entity<UserDiseaseVisibility>()
+    .HasOne(x => x.Disease)
+    .WithMany()
+    .HasForeignKey(x => x.DiseaseId)
+    .OnDelete(DeleteBehavior.Cascade);
+
+
             //for drugdisease
            
             modelBuilder.Entity<DrugDisease>()

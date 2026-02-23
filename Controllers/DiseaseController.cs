@@ -7,77 +7,91 @@ using SearchTool_ServerSide.Services;
 namespace SearchTool_ServerSide.Controllers
 {
     [ApiController]
-    [Route("Disease"),Authorize(Policy = "Pharmacist")]
-    public class DiseaseController(DiseaseService diseaseService,UserAccessToken userAccessToken) : ControllerBase
+    [Route("Disease"), Authorize(Policy = "Pharmacist")]
+    public class DiseaseController : ControllerBase
     {
+        private readonly DiseaseService _diseaseService;
+        private readonly UserAccessToken _userAccessToken;
+
+        public DiseaseController(DiseaseService diseaseService, UserAccessToken userAccessToken)
+        {
+            _diseaseService = diseaseService;
+            _userAccessToken = userAccessToken;
+        }
+
         [HttpGet("GetByName/{name}")]
         public async Task<IActionResult> GetDiseaseByName(string name)
         {
-            var disease = await diseaseService.GetDiseaseByName(name);
-            if (disease == null)
-            {
-                return NotFound();
-            }
+            var disease = await _diseaseService.GetDiseaseByName(name);
+            if (disease == null) return NotFound();
             return Ok(disease);
         }
-        [HttpGet("SearchByDisease")]
-       public async Task<IActionResult> SearchByDisease([FromQuery] string name)
-        {
-            var disease =  await diseaseService.SearchByDisease(name);
 
+        [HttpGet("GetAllVisible")]
+        public async Task<IActionResult> GetAllVisible()
+        {
+            var token = _userAccessToken.tokenData();
+            var userId = int.TryParse(token.UserId, out var id) ? id : 0;
+
+            var diseases = await _diseaseService.GetVisibleDiseasesAsync(userId);
+            return Ok(diseases);
+        }
+
+        [HttpGet("SearchByDisease")]
+        public async Task<IActionResult> SearchByDisease([FromQuery] string name)
+        {
+            var disease = await _diseaseService.SearchByDisease(name);
             return Ok(disease);
         }
+
         [HttpGet("GetAll")]
         public async Task<IActionResult> GetAllDiseases()
         {
-            var diseases = await diseaseService.GetAllDiseases();
+            var diseases = await _diseaseService.GetAllDiseases();
             return Ok(diseases);
         }
-        [HttpPost("Add"),Authorize(Policy = "Doctor")]
+
+        [HttpPost("Add"), Authorize(Policy = "Doctor")]
         public async Task<IActionResult> AddDisease([FromBody] DiseaseAddDto diseaseAddDto)
         {
-            var disease = await diseaseService.AddDisease(diseaseAddDto);
+            var disease = await _diseaseService.AddDisease(diseaseAddDto);
             return Ok(disease);
         }
+
         [HttpGet("GetDrugInteractions/{diseaseName}")]
-        public async Task<IActionResult> GetDrugInteractions([FromQuery] string diseaseName, [FromQuery] int pageSize = 10, [FromQuery] int pageNumber = 1)
+        public async Task<IActionResult> GetDrugInteractions(
+            [FromQuery] string diseaseName,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] int pageNumber = 1)
         {
-            var interactions = await diseaseService.GetDrugInteractions(diseaseName, pageSize, pageNumber);
+            var interactions = await _diseaseService.GetDrugInteractions(diseaseName, pageSize, pageNumber);
             return Ok(interactions);
         }
-        [HttpPost("AddDrugDisease"),Authorize(Policy = "Doctor")]
-        public async Task<IActionResult> AddDrugDisease([FromBody] DrugDiseaseHistoryAddDto drugDiseaseHistoryAddDto)
+
+        [HttpPost("AddDrugDisease"), Authorize(Policy = "Doctor")]
+        public async Task<IActionResult> AddDrugDisease([FromBody] DrugDiseaseHistoryAddDto dto)
         {
-            var user = userAccessToken.tokenData();
-            drugDiseaseHistoryAddDto.UserId = int.TryParse(user.UserId, out var userId) ? userId : 103;
-            var drugDisease = await diseaseService.AddDrugDiseaseHistory(drugDiseaseHistoryAddDto);
+            var user = _userAccessToken.tokenData();
+            dto.UserId = int.TryParse(user.UserId, out var userId) ? userId : dto.UserId;
+
+            var drugDisease = await _diseaseService.AddDrugDiseaseHistory(dto);
             return Ok(drugDisease);
         }
+
         [HttpGet("GetDrugDiseaseHistory"), Authorize(Policy = "Doctor")]
         public async Task<IActionResult> GetDrugDiseaseHistory()
         {
-            var userEmail = userAccessToken.tokenData().Email;
-            var history = await diseaseService.GetDrugDiseaseHistory(userEmail);
+            var userEmail = _userAccessToken.tokenData().Email;
+            var history = await _diseaseService.GetDrugDiseaseHistory(userEmail);
             return Ok(history);
         }
-        [HttpGet("SoftDeleteDrugDiseaseHistory/{id}"),Authorize(Policy = "Doctor")]
+
+        [HttpGet("SoftDeleteDrugDiseaseHistory/{id}"), Authorize(Policy = "Doctor")]
         public async Task<IActionResult> SoftDeleteDrugDiseaseHistory(int id)
         {
-            var result = await diseaseService.SoftDeleteDrugDiseaseHistory(id);
-            if (!result)
-            {
-                return NotFound();
-            }
+            var result = await _diseaseService.SoftDeleteDrugDiseaseHistory(id);
+            if (!result) return NotFound();
             return Ok();
         }
-
-/*
-        [HttpGet("GetAllDrugDiseasesByDrugId")]
-public async Task<IActionResult> GetAllDrugDiseasesByDrugId([FromQuery] int id)
-{
-    var data = await diseaseService.GetAllDrugDiseasesByDrugIdAsync(id);
-    return Ok(data);
-}*/
-
     }
 }
