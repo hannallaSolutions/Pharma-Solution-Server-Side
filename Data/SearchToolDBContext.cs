@@ -142,8 +142,6 @@ namespace SearchTool_ServerSide.Data
         public DbSet<DrugAlternativeStatus> DrugAlternativeStatuses { get; set; }
         public DbSet<DrugAlternativeReport> DrugAlternativeReports { get; set; }
         public DbSet<DrugDiseaseAddHistory> DrugDiseaseAddHistories { get; set; }
-        
-        public DbSet<DrugDisease> DrugDiseases { get; set; }
         public DbSet<Disease> Diseases { get; set; }
         public DbSet<Permission> Permissions { get; set; }
         public DbSet<RolePermission> RolePermissions { get; set; }

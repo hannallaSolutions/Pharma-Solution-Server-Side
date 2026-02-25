@@ -78,7 +78,7 @@ namespace SearchTool_ServerSide.Migrations
                     b.HasIndex("OrderItemId")
                         .IsUnique();
 
-                    b.ToTable("SearchLogReadDto");
+                    b.ToTable("SearchLogReadDto", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.Branch", b =>
@@ -108,7 +108,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("MainCompanyId");
 
-                    b.ToTable("Branches");
+                    b.ToTable("Branches", (string)null);
 
                     b.HasData(
                         new
@@ -180,7 +180,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Chats");
+                    b.ToTable("Chats", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.ClassInfo", b =>
@@ -202,7 +202,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("ClassTypeId");
 
-                    b.ToTable("ClassInfos");
+                    b.ToTable("ClassInfos", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.ClassInsurance", b =>
@@ -259,7 +259,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("DrugId");
 
-                    b.ToTable("ClassInsurances");
+                    b.ToTable("ClassInsurances", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.ClassType", b =>
@@ -280,7 +280,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("ClassTypes");
+                    b.ToTable("ClassTypes", (string)null);
 
                     b.HasData(
                         new
@@ -312,7 +312,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Diseases");
+                    b.ToTable("Diseases", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.Drug", b =>
@@ -369,7 +369,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Drugs");
+                    b.ToTable("Drugs", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.DrugAlternativeReport", b =>
@@ -418,7 +418,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("ClassInfoId", "SourceDrugNDC", "TargetDrugNDC", "StatusDate");
 
-                    b.ToTable("DrugAlternativeReports");
+                    b.ToTable("DrugAlternativeReports", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.DrugAlternativeStatus", b =>
@@ -442,7 +442,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("TargetDrugNDC");
 
-                    b.ToTable("DrugAlternativeStatuses");
+                    b.ToTable("DrugAlternativeStatuses", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.DrugBranch", b =>
@@ -463,7 +463,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("BranchId");
 
-                    b.ToTable("DrugBranches");
+                    b.ToTable("DrugBranches", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.DrugClass", b =>
@@ -481,7 +481,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("ClassId");
 
-                    b.ToTable("DrugClasses");
+                    b.ToTable("DrugClasses", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.DrugDiseaseAddHistory", b =>
@@ -519,7 +519,7 @@ namespace SearchTool_ServerSide.Migrations
                     b.HasIndex("DrugId", "DiseaseId", "UserId")
                         .IsUnique();
 
-                    b.ToTable("DrugDiseaseAddHistories");
+                    b.ToTable("DrugDiseaseAddHistories", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.DrugInsurance", b =>
@@ -574,7 +574,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("DrugId");
 
-                    b.ToTable("DrugInsurances");
+                    b.ToTable("DrugInsurances", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.DrugMedi", b =>
@@ -616,7 +616,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("DrugId");
 
-                    b.ToTable("DrugMedis");
+                    b.ToTable("DrugMedis", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.FeedbackFormEntry", b =>
@@ -639,7 +639,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("FeedbackForms");
+                    b.ToTable("FeedbackForms", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.Insurance", b =>
@@ -662,7 +662,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Insurances");
+                    b.ToTable("Insurances", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.InsurancePCN", b =>
@@ -684,7 +684,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("InsuranceId");
 
-                    b.ToTable("InsurancePCNs");
+                    b.ToTable("InsurancePCNs", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.InsuranceRx", b =>
@@ -706,7 +706,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("InsurancePCNId");
 
-                    b.ToTable("InsuranceRxes");
+                    b.ToTable("InsuranceRxes", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.InsuranceStatus", b =>
@@ -734,7 +734,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("TargetDrugNDC");
 
-                    b.ToTable("InsuranceStatuses");
+                    b.ToTable("InsuranceStatuses", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.Log", b =>
@@ -775,7 +775,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("UserEmail");
 
-                    b.ToTable("Logs");
+                    b.ToTable("Logs", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.MainCompany", b =>
@@ -802,7 +802,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("SpecialtyId");
 
-                    b.ToTable("MainCompanies");
+                    b.ToTable("MainCompanies", (string)null);
 
                     b.HasData(
                         new
@@ -851,7 +851,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("ChatId", "Timestamp");
 
-                    b.ToTable("Messages");
+                    b.ToTable("Messages", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.Order", b =>
@@ -897,7 +897,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Orders");
+                    b.ToTable("Orders", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.OrderItem", b =>
@@ -948,7 +948,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("OrderId");
 
-                    b.ToTable("OrderItems");
+                    b.ToTable("OrderItems", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.Permission", b =>
@@ -1005,7 +1005,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Products");
+                    b.ToTable("Products", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.QuestionEntry", b =>
@@ -1043,7 +1043,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("SectionEntryId");
 
-                    b.ToTable("Questions");
+                    b.ToTable("Questions", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.Report", b =>
@@ -1092,7 +1092,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("InsuranceRxId", "SourceDrugNDC", "TargetDrugNDC", "StatusDate");
 
-                    b.ToTable("Reports");
+                    b.ToTable("Reports", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.RolePermission", b =>
@@ -1171,7 +1171,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("UserEmail");
 
-                    b.ToTable("ScriptItems");
+                    b.ToTable("ScriptItems", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.SearchDrugDetailsLogs", b =>
@@ -1193,7 +1193,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("NDC");
 
-                    b.ToTable("DrugModals");
+                    b.ToTable("DrugModals", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.SearchLog", b =>
@@ -1247,7 +1247,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("UserEmail");
 
-                    b.ToTable("SearchLogs");
+                    b.ToTable("SearchLogs", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.SectionEntry", b =>
@@ -1269,7 +1269,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("FeedbackFormEntryId");
 
-                    b.ToTable("Sections");
+                    b.ToTable("Sections", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.Specialty", b =>
@@ -1286,7 +1286,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Specialties");
+                    b.ToTable("Specialties", (string)null);
 
                     b.HasData(
                         new
@@ -1333,7 +1333,7 @@ namespace SearchTool_ServerSide.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("ServerSide.Models.Script", b =>
@@ -1363,7 +1363,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Scripts");
+                    b.ToTable("Scripts", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Dtos.SearchLogDtos.SearchLogReadDto", b =>
