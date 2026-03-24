@@ -4,11 +4,13 @@ using SearchTool_ServerSide.Authentication;
 using SearchTool_ServerSide.Dtos.InsuranceDtos.cs;
 using SearchTool_ServerSide.Models;
 using SearchTool_ServerSide.Services;
+using SearchTool_ServerSide.Authorization;
 
 namespace SearchTool_ServerSide.Controllers
 {
     [ApiController]
-    [Route("Insurance"), Authorize(Policy = "Pharmacist")]
+    [Route("Insurance")]
+   // [HasPermission("manage_insuranceController")]
     public class InsuranceController(InsuranceService _insuranceService, UserAccessToken userAccessToken) : ControllerBase
     {
         [HttpGet("GetInsuranceDetails")]

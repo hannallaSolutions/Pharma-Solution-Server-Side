@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SearchTool_ServerSide.Authorization;
 
 namespace SearchTool_ServerSide.Controllers
 {
     [ApiController]
-    [Route("DBSync"), Authorize(Policy = "SuperAdmin")]
+    [Route("DBSync")]
+    [HasPermission("SyncDatabase")]
     public class DBSyncController(DataSyncService _dataSyncService) : ControllerBase
     {
         [HttpPost("SyncUsers")]

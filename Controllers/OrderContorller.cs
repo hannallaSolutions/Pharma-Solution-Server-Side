@@ -6,12 +6,13 @@ using SearchTool_ServerSide.Dtos.OrderDtos;
 using SearchTool_ServerSide.Dtos.OrderItemDtos;
 using SearchTool_ServerSide.Dtos.SearchLogDtos;
 using SearchTool_ServerSide.Services;
+using SearchTool_ServerSide.Authorization;
 
 namespace SearchTool_ServerSide.Controllers
 {
     [ApiController]
-    [Route("order"),Authorize(Policy ="Pharmacist")]
-
+    [Route("order")]
+ //   [HasPermission("manage_orders")]
     public class OrderController(UserAccessToken userAccessToken, OrderService _orderService) : ControllerBase
     {
         [HttpGet("GetAllOrders")]

@@ -41,21 +41,6 @@ namespace SearchTool_ServerSide.Controllers
 
         // create new permission
 
-      /*  [HttpPost]
-        public async Task<IActionResult> CreatePermission([FromBody] CreatePermissionDto p)
-
-        {
-             var newPermission = new Permission
-             {
-                Nmae = p.Name,
-                Description = p.Description
-             };
-                _db.Permissions.Add(newPermission);
-                await _db.SaveChangesAsync();
-
-                return CreatedAtAction(nameof(GetPermissionById), new { id =newPermission.Id }, newPermission);
-        }
-*/
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreatePermissionDto dto)
         {
@@ -68,7 +53,9 @@ namespace SearchTool_ServerSide.Controllers
             var p = new Permission
             {
                 Name = name,
-                Description = dto.Description?.Trim()
+                Description = dto.Description?.Trim(),
+                Url = dto.Url.Trim(),
+                HttpMethod = dto.HttpMethod.Trim().ToUpper()
             };
 
             _db.Permissions.Add(p);
@@ -98,6 +85,8 @@ namespace SearchTool_ServerSide.Controllers
 
             permission.Name = name;
             permission.Description = dto.Description;
+            permission.Url = dto.Url;
+            permission.HttpMethod = dto.HttpMethod;
 
             await _db.SaveChangesAsync();
             return Ok(permission);

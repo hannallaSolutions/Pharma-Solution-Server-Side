@@ -6,6 +6,7 @@ using SearchTool_ServerSide.Models;
 using SearchTool_ServerSide.Services;
 using SearchTool_ServerSide.Data;
 using Microsoft.EntityFrameworkCore;
+using SearchTool_ServerSide.Authorization;
 
 namespace SearchTool_ServerSide.Controllers
 {
@@ -26,7 +27,8 @@ namespace SearchTool_ServerSide.Controllers
             _context = context;
         }
 
-        [HttpGet("GetAllMainCompanies"), Authorize(Policy = "SuperAdmin")]
+        [HttpGet("GetAllMainCompanies")]
+     //   [HasPermission("GetAllMainCompanies")]
         public async Task<IActionResult> GetAllMainCompaniesAsync()
         {
             var companies = await _mainCompanyService.GetAllMainCompaniesAsync();
@@ -41,7 +43,8 @@ namespace SearchTool_ServerSide.Controllers
         }
 
         
-        [HttpPost("AddMainCompany"), Authorize(Policy = "SuperAdmin")]
+        [HttpPost("AddMainCompany")]
+      //  [HasPermission("GetAllMainCompanies")]
         public async Task<IActionResult> AddMainCompanyAsync([FromBody]MainCompanyAddDto mainCompanyDto)
         {
             if (mainCompanyDto == null || string.IsNullOrWhiteSpace(mainCompanyDto.Name) || mainCompanyDto.SpecialtyId <= 0)

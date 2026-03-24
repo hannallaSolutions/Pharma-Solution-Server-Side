@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using SearchTool_ServerSide.Authentication;
 using SearchTool_ServerSide.Dtos.DiseaseDtos;
 using SearchTool_ServerSide.Services;
+using SearchTool_ServerSide.Authorization;
 
 namespace SearchTool_ServerSide.Controllers
 {
@@ -68,7 +69,8 @@ namespace SearchTool_ServerSide.Controllers
             return Ok(interactions);
         }
 
-        [HttpPost("AddDrugDisease"), Authorize(Policy = "Doctor")]
+        [HttpPost("AddDrugDisease"), Authorize]
+        [HasPermission("AddDrugToDisease")]
         public async Task<IActionResult> AddDrugDisease([FromBody] DrugDiseaseHistoryAddDto dto)
         {
             var user = _userAccessToken.tokenData();
@@ -78,7 +80,7 @@ namespace SearchTool_ServerSide.Controllers
             return Ok(drugDisease);
         }
 
-        [HttpGet("GetDrugDiseaseHistory"), Authorize(Policy = "Doctor")]
+        [HttpGet("GetDrugDiseaseHistory"), Authorize]
         public async Task<IActionResult> GetDrugDiseaseHistory()
         {
             var userEmail = _userAccessToken.tokenData().Email;

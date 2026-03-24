@@ -2,15 +2,18 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SearchTool_ServerSide.Authentication;
 using SearchTool_ServerSide.Models;
+using SearchTool_ServerSide.Authorization;
 
 namespace SearchTool_ServerSide.Controllers
 {
     [ApiController]
-    [Route("feedback"), Authorize(Policy = "Pharmacist")]
+    [Route("feedback")]
+
     public class FeedbackController(FeedbackService feedbackService, UserAccessToken userAccessToken) : ControllerBase
     {
 
         [HttpPost("submit")]
+        [HasPermission("feedback.submit")]
         public async Task<IActionResult> Submit([FromBody] FeedbackFormResponse feedback)
         {
             var userData = userAccessToken.tokenData();
@@ -29,7 +32,8 @@ namespace SearchTool_ServerSide.Controllers
             await feedbackService.SaveFeedbackAsync(feedback);
             return Ok(new { message = "Feedback submitted to DB" });
         }
-        [HttpGet("all"),Authorize(Policy = "SuperAdmin")]
+        [HttpGet("all")]
+         [HasPermission("feedback.view")]
         public async Task<IActionResult> GetAllFeedbacks()
         {
             var feedbackList = await feedbackService.GetAllFeedbackAsync();

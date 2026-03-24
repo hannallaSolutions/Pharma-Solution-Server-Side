@@ -10,6 +10,8 @@ using SearchTool_ServerSide.Models;
 using SearchTool_ServerSide.Repository;
 using SearchTool_ServerSide.Services;
 using ServerSide;
+using Microsoft.AspNetCore.Authorization;
+using SearchTool_ServerSide.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>();
@@ -94,6 +96,10 @@ builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddMemoryCache();
 
+//for permissions
+builder.Services.AddScoped<IAuthorizationHandler, PermissionHandler>();
+builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
+builder.Services.AddAuthorization();
 
 var allowedOrigins = new List<string>
 {
@@ -134,5 +140,6 @@ app.UseCors("CorsPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<UserLogsMiddleware>();
+app.UseMiddleware<PermissionMiddleware>();
 app.MapControllers();
 app.Run();

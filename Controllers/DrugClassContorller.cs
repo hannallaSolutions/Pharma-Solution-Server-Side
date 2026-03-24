@@ -1,12 +1,13 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SearchTool_ServerSide.Authentication;
+using SearchTool_ServerSide.Authorization;
 using SearchTool_ServerSide.Services;
 
 namespace SearchTool_ServerSide.Controllers
 {
     [ApiController]
-    [Route("drugClass"),Authorize(Policy = "Pharmacist")]
+    [Route("drugClass"), Authorize]
     public class DrugClassContorller : ControllerBase
     {
         private readonly DrugClassService _drugClassService;

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using SearchTool_ServerSide.Authentication;
+using SearchTool_ServerSide.Authorization;
 using SearchTool_ServerSide.Dtos.ClassDtos;
 using SearchTool_ServerSide.Dtos.ScritpsDto;
 using SearchTool_ServerSide.Models;
@@ -11,7 +12,7 @@ using static SearchTool_ServerSide.Repository.DrugRepository;
 
 namespace SearchTool_ServerSide.Controllers
 {
-    [ApiController, Route("drug"), Authorize, Authorize(Policy = "Pharmacist")]
+    [ApiController, Route("drug"), Authorize]
     public class DrugController(DrugService _drugService, UserAccessToken userAccessToken) : ControllerBase
     {
         [HttpGet, AllowAnonymous]
@@ -32,7 +33,7 @@ namespace SearchTool_ServerSide.Controllers
             var items = await _drugService.GetAll();
             return Ok(items);
         }
-        [HttpPost("ImportDrugInsuranceFileAsync"), Authorize(Policy = "Admin")]
+        [HttpPost("ImportDrugInsuranceFileAsync")]
         [RequestSizeLimit(50_000_000)] // optional: 50 MB
         public async Task<IActionResult> ImportDrugInsuranceFileAsync([FromForm] IFormFile file, CancellationToken ct)
         {
@@ -170,7 +171,7 @@ namespace SearchTool_ServerSide.Controllers
             var items = await _drugService.GetInsuranceByNdc(ndc);
             return Ok(items);
         }
-        [HttpGet("GetScriptByScriptCode"), Authorize(Policy = "Admin")]
+        [HttpGet("GetScriptByScriptCode")]
         public async Task<IActionResult> GetScriptByScriptCode([FromQuery] string scriptCode)
         {
             var script = await _drugService.GetScriptAsync(scriptCode);
@@ -268,7 +269,7 @@ namespace SearchTool_ServerSide.Controllers
             var items = await _drugService.GetInsurancesRxByPcnId(pcnId);
             return Ok(items);
         }
-        [HttpGet("GetAllLatestScriptsPaginated"), Authorize(Policy = "Admin"), Authorize]
+        [HttpGet("GetAllLatestScriptsPaginated"), Authorize]
         public async Task<IActionResult> GetAllLatestScriptsPaginated([FromQuery] int pageNumber, [FromQuery] int pageSize, [FromQuery] string classVersion = "ClassV1", [FromQuery] string matchOn = "BIN")
         {
             var items = await _drugService.GetAllLatestScriptsPaginated(pageNumber, pageSize, classVersion, matchOn);
@@ -382,19 +383,19 @@ namespace SearchTool_ServerSide.Controllers
             var result = await _drugService.GetAlternativesNoInsurancePaged(classInfoId, rxgroupId, sourceDrugNDC, pageNumber, pageSize);
             return Ok(result);
         }
-        [HttpGet("GetDrugInsuranceNDCS"), Authorize(Policy = "Pharmacist")]
+        [HttpGet("GetDrugInsuranceNDCS")]
         public async Task<IActionResult> GetDrugInsuranceNDCS([FromQuery] string drugName, [FromQuery] int? insuranceId)
         {
             var items = await _drugService.GetDrugInsuranceNDCS(drugName, insuranceId);
             return Ok(new { InsuranceNDC = items.InsuranceNDC, AllInsuranceNDC = items.AllInsuranceNDC });
         }
-        [HttpGet("GetAllDrugClassesVersions"), Authorize(Policy = "Admin")]
+        [HttpGet("GetAllDrugClassesVersions")]
         public async Task<IActionResult> GetAllDrugClassesVersions()
         {
             var items = await _drugService.GetAllDrugClassesVersions();
             return Ok(items);
         }
-        [HttpPost("AddClassVersion"), Authorize(Policy = "SuperAdmin")]
+        [HttpPost("AddClassVersion")]
         [RequestSizeLimit(50_000_000)] // optional: 50 MB
         public async Task<IActionResult> AddClassVersion([FromForm] ClassVersionUploadDto model)
         {
@@ -405,7 +406,8 @@ namespace SearchTool_ServerSide.Controllers
             );
             return Ok(result);
         }
-        [HttpGet("GetAllDrugsForSuperAdmin"), Authorize(Policy = "SuperAdmin")]
+        [HttpGet("GetAllDrugsForSuperAdmin")]
+
         public async Task<IActionResult> GetAllDrugsForSuperAdmin([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20)
         {
             var items = await _drugService.GetAllDrugsForSuperAdminAsync(pageNumber, pageSize);

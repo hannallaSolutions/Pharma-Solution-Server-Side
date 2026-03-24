@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SearchTool_ServerSide.Dtos;
 using SearchTool_ServerSide.Services;
+using SearchTool_ServerSide.Authentication;
+using SearchTool_ServerSide.Authorization;
 
 namespace SearchTool_ServerSide.Controllers
 {
@@ -17,7 +19,6 @@ namespace SearchTool_ServerSide.Controllers
         }
 
         [HttpGet("simple")]
-        [Authorize] // شيلها مؤقتًا لو عايز تختبر بدون توكن
         public async Task<ActionResult<PagedResponse<SimpleScriptDto>>> GetScriptsSimple(
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10)

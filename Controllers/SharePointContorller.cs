@@ -1,11 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SearchTool_ServerSide.Authorization;
 
 namespace SearchTool_ServerSide.Controllers
 {
     [ApiController]
     [Route("sharePoint")]
-    [Authorize, Authorize(Policy = "Admin")]
+   // [HasPermission("sharePoint_access")]
     public class SharePointController : ControllerBase
     {
         [HttpGet("token-test")]

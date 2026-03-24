@@ -34,7 +34,6 @@ namespace SearchTool_ServerSide.Data
 
         public DbSet<RolePermission> RolePermissions { get; set; }
         
-
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

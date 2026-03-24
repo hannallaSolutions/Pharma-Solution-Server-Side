@@ -6,6 +6,7 @@ using SearchTool_ServerSide.Dtos.UserDtos;
 using SearchTool_ServerSide.Models;
 using SearchTool_ServerSide.Repository;
 using SearchTool_ServerSide.Services;
+using SearchTool_ServerSide.Authorization;
 
 namespace SearchTool_ServerSide.Controllers
 {
@@ -27,6 +28,8 @@ namespace SearchTool_ServerSide.Controllers
             var user = await _userService.Register(userAddDto);
             return Ok(user);
         }
+
+
         [HttpPost("login")]
         public async Task<IActionResult> Login(UserLoginDto userLoginDto)
         {
@@ -92,7 +95,7 @@ namespace SearchTool_ServerSide.Controllers
             });
         }
 
-        [HttpGet("UserById"), Authorize(Policy = "Pharmacist"), Authorize]
+        [HttpGet("UserById"), Authorize]
         public async Task<IActionResult> GetUserById()
         {
             var userData = userAccessToken.tokenData();
@@ -169,13 +172,16 @@ namespace SearchTool_ServerSide.Controllers
 
             return Ok("LogOut Success");
         }
-        [HttpGet("AllUsers"), Authorize(Policy = "SuperAdmin")]
+        [HttpGet("AllUsers") ,Authorize]
+      //  [HasPermission("GetAllUsers + ResetUserPassword")]
         public async Task<IActionResult> GetAllUsers()
         {
             var users = await _userService.GetAllUsers();
             return Ok(users);
         }
-        [HttpPost("ResetPassword"), Authorize(Policy = "SuperAdmin")]
+        [HttpPost("ResetPassword"), Authorize]
+     //   [HasPermission("GetAllUsers + ResetUserPassword")]
+
         public async Task<IActionResult> ResetUserPassword([FromQuery] string userEmail)
         {
             var result = await _userService.ResetUserPassword(userEmail);
@@ -185,7 +191,8 @@ namespace SearchTool_ServerSide.Controllers
             }
             return Ok("Password reset successfully");
         }
-        [HttpPut("EditUser"), Authorize(Policy = "SuperAdmin")]
+        [HttpPut("EditUser"), Authorize]
+      //      [HasPermission("GetAllUsers + ResetUserPassword") ]
         public async Task<IActionResult> EditUser([FromQuery]int userId, [FromBody]UserReadDto userReadDto)
         {
             var updatedUser = await _userService.EditUser(userId, userReadDto);
