@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SearchTool_ServerSide.Data;
 using SearchTool_ServerSide.Models;
+using System.Text.Json;
 
 namespace SearchTool_ServerSide.Services
 {
@@ -14,6 +15,9 @@ namespace SearchTool_ServerSide.Services
 
         // NEW: load full chat messages (for widget open)
         Task<ChatDetailsDto?> GetChatDetailsAsync(int chatId, int userId, CancellationToken ct);
+
+        // NEW: suggest follow-up questions based on user chat history
+        Task<List<string>> GetSuggestedQuestionsAsync(int? chatId, int userId, int take, CancellationToken ct);
     }
 
     public sealed record ChatListItemDto(
@@ -64,7 +68,7 @@ namespace SearchTool_ServerSide.Services
             var history = await LoadHistoryAsync(actualChatId, GeminiChatService.MaxMessageContext, ct);
 
             // 4) Call Gemini
-            var reply = await _gemini.SendMessageAsync(message.Trim(), history, ct);
+            var reply = await _gemini.SendMessageAsync(message.Trim(), history);
 
             // 5) Save model reply
             await AddMessageAsync(actualChatId, "model", reply, ct);
@@ -126,6 +130,99 @@ namespace SearchTool_ServerSide.Services
             return new ChatDetailsDto(chatId, msgs);
         }
 
+        // ===================== NEW: Suggest follow-up questions =====================
+        public async Task<List<string>> GetSuggestedQuestionsAsync(int? chatId, int userId, int take, CancellationToken ct)
+        {
+            take = Math.Clamp(take, 1, 10);
+
+            int actualChatId;
+            if (chatId.HasValue && chatId.Value > 0)
+            {
+                // validate ownership via EnsureChatAsync (throws if not found)
+                actualChatId = await EnsureChatAsync(chatId, userId, ct);
+            }
+            else
+            {
+                actualChatId = await GetLatestChatIdAsync(userId, ct);
+                if (actualChatId <= 0)
+                    return new List<string>();
+            }
+
+            var history = await LoadHistoryAsync(actualChatId, GeminiChatService.MaxMessageContext, ct);
+
+var systemPrompt = $@"
+You are an expert medical assistant.
+
+Task:
+Generate exactly {take} suggested questions that the user might ask in a NEW medical chat.
+
+Guidelines:
+- Do NOT continue the previous conversation.
+- Do NOT reference any specific symptoms, drugs, diagnoses, or cases mentioned earlier.
+- Use the conversation history only to understand the user's general interests and question patterns.
+- The questions must sound like realistic first questions in a brand-new medical conversation.
+- Make the questions diverse and useful.
+- Each question must be independent and different from the others.
+- Do NOT mention previous chats or context.
+
+Output rules:
+Output must be a JSON array of strings only, for example: [""Question 1"", ""Question 2""]
+Do not add any additional text.
+";
+
+            var response = await _gemini.SendMessageAsync($"Please suggest {take} follow-up questions.", history, systemPrompt, ct);
+            return ParseSuggestedQuestions(response, take);
+        }
+
+        private async Task<int> GetLatestChatIdAsync(int userId, CancellationToken ct)
+        {
+            return await _db.Chats
+                .Where(c => c.UserId == userId && c.Show)
+                .OrderByDescending(c => c.Messages.Max(m => (DateTime?)m.Timestamp) ?? DateTime.MinValue)
+                .Select(c => c.Id)
+                .FirstOrDefaultAsync(ct);
+        }
+
+        private List<string> ParseSuggestedQuestions(string response, int maxCount)
+        {
+            if (string.IsNullOrWhiteSpace(response))
+                return new List<string>();
+
+            // Try to parse as JSON array first
+            try
+            {
+                var parsed = JsonSerializer.Deserialize<List<string>>(response);
+                if (parsed != null && parsed.Count > 0)
+                    return parsed.Take(maxCount).Select(q => q?.Trim()).Where(q => !string.IsNullOrEmpty(q)).ToList();
+            }
+            catch
+            {
+                // Ignore parse errors and fall back to line splitting
+            }
+
+            // Fall back: split by newlines and strip numbering/bullets
+            var lines = response
+                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(l => l.Trim())
+                .Select(l =>
+                {
+                    // Remove leading numbering like "1) ", "- " or "• "
+                    var idx = l.IndexOfAny(new[] { ')', '.', ' ' });
+                    if (idx > 0 && int.TryParse(l.Substring(0, idx).TrimEnd('.', ')'), out _))
+                        return l.Substring(idx + 1).Trim();
+                    if (l.StartsWith("- "))
+                        return l.Substring(2).Trim();
+                    if (l.StartsWith("• "))
+                        return l.Substring(2).Trim();
+                    return l;
+                })
+                .Where(l => !string.IsNullOrEmpty(l))
+                .Take(maxCount)
+                .ToList();
+
+            return lines;
+        }
+
         // ===================== Helpers =====================
 
         private async Task<int> EnsureChatAsync(int? chatId, int userId, CancellationToken ct)
@@ -175,7 +272,7 @@ namespace SearchTool_ServerSide.Services
         {
             var msgs = await _db.Messages
                 .AsNoTracking()
-                .Where(m => m.ChatId == chatId && m.Show)
+                .Where(m => m.ChatId == chatId && m.Show && m.Role == "user")
                 .OrderByDescending(m => m.Timestamp)
                 .Take(max)
                 .OrderBy(m => m.Timestamp)

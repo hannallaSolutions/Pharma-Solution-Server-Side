@@ -156,5 +156,27 @@ namespace SearchTool_ServerSide.Controllers
                 return StatusCode(500, new { error = ex.Message });
             }
         }
+
+        // ===================== GET: Suggest follow-up questions =====================
+        // GET /api/AIChat/SuggestQuestions?chatId=123&take=3
+        [HttpGet("SuggestQuestions")]
+        public async Task<IActionResult> SuggestQuestions(int? chatId = null, int take = 3, CancellationToken ct = default)
+        {
+            try
+            {
+                if (!TryGetUserId(out var userId, out var error))
+                    return error!;
+
+                take = Math.Clamp(take, 1, 10);
+
+                var questions = await _orchestrator.GetSuggestedQuestionsAsync(chatId, userId, take, ct);
+                return Ok(new { questions });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in SuggestQuestions endpoint");
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
     }
 }

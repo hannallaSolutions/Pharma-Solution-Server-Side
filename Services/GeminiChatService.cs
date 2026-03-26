@@ -9,7 +9,7 @@ namespace SearchTool_ServerSide.Services
 {
     public interface IGeminiChatService
     {
-        Task<string> SendMessageAsync(string message, IReadOnlyList<ChatTurn> history = null, CancellationToken ct = default);
+        Task<string> SendMessageAsync(string message, IReadOnlyList<ChatTurn> history = null, string? systemPromptOverride = null, CancellationToken ct = default);
     }
     public sealed record ChatTurn(string Role, string Text); // Role: "user" | "model"
 
@@ -47,7 +47,7 @@ namespace SearchTool_ServerSide.Services
                 new MediaTypeWithQualityHeaderValue("application/json"));
         }
 
-        public async Task<string> SendMessageAsync(string message, IReadOnlyList<ChatTurn> history = null, CancellationToken ct = default)
+        public async Task<string> SendMessageAsync(string message, IReadOnlyList<ChatTurn> history = null, string? systemPromptOverride = null, CancellationToken ct = default)
         {
             try
             {
@@ -60,7 +60,7 @@ namespace SearchTool_ServerSide.Services
                 if (string.IsNullOrWhiteSpace(_options.Model))
                     throw new InvalidOperationException("Gemini model is not configured");
 
-                var systemPrompt = $@"
+                var systemPrompt = systemPromptOverride ?? $@"
 You are a clinical decision-support assistant for licensed Doctors using a symptoms → disease portal.
 Provide concise, high-yield, evidence-based clinical guidance in Markdown.
 
@@ -113,25 +113,25 @@ OUTPUT (MARKDOWN) — always follow exactly:
 
                 var contents = new List<GeminiContent>();
 
-                // 1) Add previous turns
-                if (history != null)
+                // 1) Add previous turns (trim to max context)
+                var historyList = history?.ToList() ?? new List<ChatTurn>();
+                if (historyList.Count > MaxMessageContext)
+                    historyList = historyList.Skip(historyList.Count - MaxMessageContext).ToList();
+
+                foreach (var turn in historyList)
                 {
-                    foreach (var turn in history)
+                    if (string.IsNullOrWhiteSpace(turn?.Text)) continue;
+
+                    // Gemini expects role "user" or "model"
+                    var role = turn.Role is "user" or "model" ? turn.Role : "user";
+
+                    contents.Add(new GeminiContent
                     {
-                        if (string.IsNullOrWhiteSpace(turn?.Text)) continue;
-
-                        // Gemini expects role "user" or "model"
-                        var role = turn.Role is "user" or "model" ? turn.Role : "user";
-
-                        contents.Add(new GeminiContent
-                        {
-                            Role = role,
-                            Parts = new List<GeminiPart> { new GeminiPart { Text = turn.Text } }
-                        });
-                    }
+                        Role = role,
+                        Parts = new List<GeminiPart> { new GeminiPart { Text = turn.Text } }
+                    });
                 }
-                if (history.Count > MaxMessageContext)
-                    history = history.Skip(history.Count - MaxMessageContext).ToList();
+
                 // 2) Add the new user message at the end
                 contents.Add(new GeminiContent
                 {
