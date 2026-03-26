@@ -3205,6 +3205,7 @@ namespace SearchTool_ServerSide.Repository
 
             return newScriptItems.Count();
         }
+        
         public static string NormalizeNdcTo11Digits(string ndcCode)
         {
             // Remove hyphens

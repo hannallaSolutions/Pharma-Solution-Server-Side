@@ -141,15 +141,14 @@ namespace SearchTool_ServerSide.Data
         public DbSet<DrugAlternativeStatus> DrugAlternativeStatuses { get; set; }
         public DbSet<DrugAlternativeReport> DrugAlternativeReports { get; set; }
         public DbSet<DrugDiseaseAddHistory> DrugDiseaseAddHistories { get; set; }
-        
-        public DbSet<DrugDisease> DrugDiseases { get; set; }
         public DbSet<Disease> Diseases { get; set; }
 public DbSet<DiseaseVisibilitySettings> DiseaseVisibilitySettings { get; set; }
 public DbSet<UserDiseaseVisibility> UserDiseaseVisibility { get; set; }
 
         public DbSet<Permission> Permissions { get; set; }
         public DbSet<RolePermission> RolePermissions { get; set; }
-
+        public DbSet<Chat> Chats { get; set; }
+        public DbSet<Message> Messages { get; set; }
 
 
         // New DbSets for Permissions
@@ -187,25 +186,41 @@ modelBuilder.Entity<UserDiseaseVisibility>()
     .OnDelete(DeleteBehavior.Cascade);
 
 
-            //for drugdisease
-           
-            modelBuilder.Entity<DrugDisease>()
-            .HasOne(dd => dd.Disease)
-            .WithMany()
-            .HasForeignKey(dd => dd.DiseaseId);
+
 
           // Add index for disease name filtering
              modelBuilder.Entity<Disease>()
             .HasIndex(d => d.Name);
 
 
-            modelBuilder.Entity<DrugDiseaseAddHistory>(b =>
-{
-    b.HasKey(dd => dd.Id);
-    b.HasIndex(dd => new { dd.DrugId, dd.DiseaseId, dd.UserId })
-    .IsUnique();
 
-});
+
+            modelBuilder.Entity<Chat>(e =>
+            {
+                e.HasKey(x => x.Id);
+                e.Property(x => x.UserId).IsRequired();
+
+                e.HasMany(x => x.Messages)
+                    .WithOne(x => x.Chat)
+                    .HasForeignKey(x => x.ChatId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<Message>(e =>
+            {
+                e.HasKey(x => x.Id);
+                e.Property(x => x.Role).IsRequired().HasMaxLength(10);
+                e.Property(x => x.Text).IsRequired();
+
+                e.HasIndex(x => new { x.ChatId, x.Timestamp });
+            });
+            modelBuilder.Entity<DrugDiseaseAddHistory>(b =>
+            {
+                b.HasKey(dd => dd.Id);
+                b.HasIndex(dd => new { dd.DrugId, dd.DiseaseId, dd.UserId })
+                .IsUnique();
+
+            });
             base.OnModelCreating(modelBuilder);
             modelBuilder.Entity<InsuranceStatus>(b =>
       {
@@ -421,73 +436,73 @@ modelBuilder.Entity<UserDiseaseVisibility>()
 
                 // UserEmail -> User.Email relationship
 
-                
+
                 // UserEmail -> User.Email relationship
-                
+
             });
             modelBuilder.Entity<User>(entity =>
                 {
                     entity.HasKey(u => u.Id);
                     entity.HasIndex(u => u.Email).IsUnique(); // Required for .HasPrincipalKey
                 });
-         
-         // for permissions
-         //تعريف العلاقات والقواعد   
 
-         modelBuilder.Entity<Permission>(entity =>
-{
-    entity.ToTable("permissions");
+            // for permissions
+            //تعريف العلاقات والقواعد   
 
-    entity.HasKey(p => p.Id);
+            modelBuilder.Entity<Permission>(entity =>
+   {
+       entity.ToTable("permissions");
 
-    entity.Property(p => p.Name)
-        .IsRequired()
-        .HasMaxLength(200);
+       entity.HasKey(p => p.Id);
 
-    entity.HasIndex(p => p.Name).IsUnique();
+       entity.Property(p => p.Name)
+           .IsRequired()
+           .HasMaxLength(200);
 
-    entity.Property(p => p.Description)
-        .HasMaxLength(1000);
-});
+       entity.HasIndex(p => p.Name).IsUnique();
 
-modelBuilder.Entity<RolePermission>(entity =>
-{
-    entity.ToTable("role_permissions");
+       entity.Property(p => p.Description)
+           .HasMaxLength(1000);
+   });
 
-    entity.HasKey(rp => new { rp.Role, rp.PermissionId }); // Composite Primary Key
+            modelBuilder.Entity<RolePermission>(entity =>
+            {
+                entity.ToTable("role_permissions");
 
-    entity.Property(rp => rp.Role)
-        .HasConversion<int>(); // enum -> int
+                entity.HasKey(rp => new { rp.Role, rp.PermissionId }); // Composite Primary Key
 
-    entity.HasOne(rp => rp.Permission)
-        .WithMany(p => p.RolePermissions)
-        .HasForeignKey(rp => rp.PermissionId)
-        .OnDelete(DeleteBehavior.Cascade);
-});
+                entity.Property(rp => rp.Role)
+                    .HasConversion<int>(); // enum -> int
+
+                entity.HasOne(rp => rp.Permission)
+                    .WithMany(p => p.RolePermissions)
+                    .HasForeignKey(rp => rp.PermissionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
 
 
-             // for userpermissions as up
-       /*
-         modelBuilder.Entity<UserPermission>(entity =>
-         {
+            // for userpermissions as up
+            /*
+              modelBuilder.Entity<UserPermission>(entity =>
+              {
 
-            entity.HasKey(up => new { up.UserId, up.PermissionId }); // Composite Primary Key
+                 entity.HasKey(up => new { up.UserId, up.PermissionId }); // Composite Primary Key
 
-            entity.HasOne(up => up.User) // each UserPermission has one User
-            .WithMany(u => u.UserPermissions)   // each User has many UserPermissions
-            .HasForeignKey(up => up.UserId)    // Foreign Key
-            .OnDelete(DeleteBehavior.Cascade);  // When a User is deleted, delete related UserPermissions
+                 entity.HasOne(up => up.User) // each UserPermission has one User
+                 .WithMany(u => u.UserPermissions)   // each User has many UserPermissions
+                 .HasForeignKey(up => up.UserId)    // Foreign Key
+                 .OnDelete(DeleteBehavior.Cascade);  // When a User is deleted, delete related UserPermissions
 
-            entity.HasOne(up => up.Permission)   // each UserPermission has one Permission   
-            .WithMany(p => p.UserPermissions)    // each Permission has many UserPermissions
-            .HasForeignKey(up => up.PermissionId)  // Foreign Key
-            .OnDelete(DeleteBehavior.Cascade);    // When a Permission is deleted, delete related UserPermissions
-              
-        
+                 entity.HasOne(up => up.Permission)   // each UserPermission has one Permission   
+                 .WithMany(p => p.UserPermissions)    // each Permission has many UserPermissions
+                 .HasForeignKey(up => up.PermissionId)  // Foreign Key
+                 .OnDelete(DeleteBehavior.Cascade);    // When a Permission is deleted, delete related UserPermissions
 
-         });
-*/
-         
+
+
+              });
+     */
+
             modelBuilder.Entity<OrderItem>(entity =>
             {
                 // DrugId → Drug.Id
@@ -497,9 +512,9 @@ modelBuilder.Entity<RolePermission>(entity =>
                     .HasPrincipalKey(e => e.NDC)
                     .OnDelete(DeleteBehavior.Restrict);
             });
-         
-     
-         
+
+
+
             modelBuilder.Entity<ScriptItem>(entity =>
             {
                 entity.HasOne(e => e.Prescriber)

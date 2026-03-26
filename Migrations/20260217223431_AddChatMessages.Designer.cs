@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SearchTool_ServerSide.Data;
@@ -11,9 +12,11 @@ using SearchTool_ServerSide.Data;
 namespace SearchTool_ServerSide.Migrations
 {
     [DbContext(typeof(SearchToolDBContext))]
-    partial class SearchToolDBContextModelSnapshot : ModelSnapshot
+    [Migration("20260217223431_AddChatMessages")]
+    partial class AddChatMessages
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -78,7 +81,7 @@ namespace SearchTool_ServerSide.Migrations
                     b.HasIndex("OrderItemId")
                         .IsUnique();
 
-                    b.ToTable("SearchLogReadDto", (string)null);
+                    b.ToTable("SearchLogReadDto");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.Branch", b =>
@@ -108,7 +111,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("MainCompanyId");
 
-                    b.ToTable("Branches", (string)null);
+                    b.ToTable("Branches");
 
                     b.HasData(
                         new
@@ -180,7 +183,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Chats", (string)null);
+                    b.ToTable("Chats");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.ClassInfo", b =>
@@ -202,7 +205,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("ClassTypeId");
 
-                    b.ToTable("ClassInfos", (string)null);
+                    b.ToTable("ClassInfos");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.ClassInsurance", b =>
@@ -259,7 +262,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("DrugId");
 
-                    b.ToTable("ClassInsurances", (string)null);
+                    b.ToTable("ClassInsurances");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.ClassType", b =>
@@ -280,7 +283,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("ClassTypes", (string)null);
+                    b.ToTable("ClassTypes");
 
                     b.HasData(
                         new
@@ -312,40 +315,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Name");
-
                     b.ToTable("Diseases");
-                    b.ToTable("Diseases", (string)null);
-                });
-
-            modelBuilder.Entity("SearchTool_ServerSide.Models.DiseaseVisibilitySettings", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("Mode")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("UpdatedByUserId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("DiseaseVisibilitySettings");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            Mode = 1,
-                            UpdatedAt = new DateTime(2026, 3, 12, 19, 33, 18, 234, DateTimeKind.Utc).AddTicks(9627)
-                        });
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.Drug", b =>
@@ -402,7 +372,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Drugs", (string)null);
+                    b.ToTable("Drugs");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.DrugAlternativeReport", b =>
@@ -451,7 +421,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("ClassInfoId", "SourceDrugNDC", "TargetDrugNDC", "StatusDate");
 
-                    b.ToTable("DrugAlternativeReports", (string)null);
+                    b.ToTable("DrugAlternativeReports");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.DrugAlternativeStatus", b =>
@@ -475,7 +445,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("TargetDrugNDC");
 
-                    b.ToTable("DrugAlternativeStatuses", (string)null);
+                    b.ToTable("DrugAlternativeStatuses");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.DrugBranch", b =>
@@ -496,7 +466,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("BranchId");
 
-                    b.ToTable("DrugBranches", (string)null);
+                    b.ToTable("DrugBranches");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.DrugClass", b =>
@@ -514,45 +484,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("ClassId");
 
-                    b.ToTable("DrugClasses", (string)null);
-                });
-
-            modelBuilder.Entity("SearchTool_ServerSide.Models.DrugDisease", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("DiseaseId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("DrugId")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("Show")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("userEmail")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DiseaseId");
-
-                    b.HasIndex("DrugId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("DrugDiseases");
+                    b.ToTable("DrugClasses");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.DrugDiseaseAddHistory", b =>
@@ -590,7 +522,7 @@ namespace SearchTool_ServerSide.Migrations
                     b.HasIndex("DrugId", "DiseaseId", "UserId")
                         .IsUnique();
 
-                    b.ToTable("DrugDiseaseAddHistories", (string)null);
+                    b.ToTable("DrugDiseaseAddHistories");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.DrugInsurance", b =>
@@ -645,7 +577,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("DrugId");
 
-                    b.ToTable("DrugInsurances", (string)null);
+                    b.ToTable("DrugInsurances");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.DrugMedi", b =>
@@ -687,7 +619,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("DrugId");
 
-                    b.ToTable("DrugMedis", (string)null);
+                    b.ToTable("DrugMedis");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.FeedbackFormEntry", b =>
@@ -710,7 +642,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("FeedbackForms", (string)null);
+                    b.ToTable("FeedbackForms");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.Insurance", b =>
@@ -733,7 +665,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Insurances", (string)null);
+                    b.ToTable("Insurances");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.InsurancePCN", b =>
@@ -755,7 +687,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("InsuranceId");
 
-                    b.ToTable("InsurancePCNs", (string)null);
+                    b.ToTable("InsurancePCNs");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.InsuranceRx", b =>
@@ -777,7 +709,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("InsurancePCNId");
 
-                    b.ToTable("InsuranceRxes", (string)null);
+                    b.ToTable("InsuranceRxes");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.InsuranceStatus", b =>
@@ -805,7 +737,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("TargetDrugNDC");
 
-                    b.ToTable("InsuranceStatuses", (string)null);
+                    b.ToTable("InsuranceStatuses");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.Log", b =>
@@ -825,6 +757,18 @@ namespace SearchTool_ServerSide.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("NOW()");
 
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("DeviceInfo")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("IpAddress")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("UserEmail")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -834,7 +778,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("UserEmail");
 
-                    b.ToTable("Logs", (string)null);
+                    b.ToTable("Logs");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.MainCompany", b =>
@@ -861,7 +805,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("SpecialtyId");
 
-                    b.ToTable("MainCompanies", (string)null);
+                    b.ToTable("MainCompanies");
 
                     b.HasData(
                         new
@@ -910,7 +854,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("ChatId", "Timestamp");
 
-                    b.ToTable("Messages", (string)null);
+                    b.ToTable("Messages");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.Order", b =>
@@ -956,7 +900,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Orders", (string)null);
+                    b.ToTable("Orders");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.OrderItem", b =>
@@ -1007,7 +951,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("OrderId");
 
-                    b.ToTable("OrderItems", (string)null);
+                    b.ToTable("OrderItems");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.Permission", b =>
@@ -1022,18 +966,10 @@ namespace SearchTool_ServerSide.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
-                    b.Property<string>("HttpMethod")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
-
-                    b.Property<string>("Url")
-                        .IsRequired()
-                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -1072,7 +1008,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Products", (string)null);
+                    b.ToTable("Products");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.QuestionEntry", b =>
@@ -1110,7 +1046,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("SectionEntryId");
 
-                    b.ToTable("Questions", (string)null);
+                    b.ToTable("Questions");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.Report", b =>
@@ -1159,7 +1095,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("InsuranceRxId", "SourceDrugNDC", "TargetDrugNDC", "StatusDate");
 
-                    b.ToTable("Reports", (string)null);
+                    b.ToTable("Reports");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.RolePermission", b =>
@@ -1238,7 +1174,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("UserEmail");
 
-                    b.ToTable("ScriptItems", (string)null);
+                    b.ToTable("ScriptItems");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.SearchDrugDetailsLogs", b =>
@@ -1260,7 +1196,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("NDC");
 
-                    b.ToTable("DrugModals", (string)null);
+                    b.ToTable("DrugModals");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.SearchLog", b =>
@@ -1314,7 +1250,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("UserEmail");
 
-                    b.ToTable("SearchLogs", (string)null);
+                    b.ToTable("SearchLogs");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.SectionEntry", b =>
@@ -1336,7 +1272,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("FeedbackFormEntryId");
 
-                    b.ToTable("Sections", (string)null);
+                    b.ToTable("Sections");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.Specialty", b =>
@@ -1353,7 +1289,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Specialties", (string)null);
+                    b.ToTable("Specialties");
 
                     b.HasData(
                         new
@@ -1400,31 +1336,7 @@ namespace SearchTool_ServerSide.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
-                    b.ToTable("Users", (string)null);
-                });
-
-            modelBuilder.Entity("SearchTool_ServerSide.Models.UserDiseaseVisibility", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("DiseaseId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DiseaseId");
-
-                    b.HasIndex("UserId", "DiseaseId")
-                        .IsUnique();
-
-                    b.ToTable("UserDiseaseVisibility");
+                    b.ToTable("Users");
                 });
 
             modelBuilder.Entity("ServerSide.Models.Script", b =>
@@ -1454,7 +1366,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Scripts", (string)null);
+                    b.ToTable("Scripts");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Dtos.SearchLogDtos.SearchLogReadDto", b =>
@@ -1611,33 +1523,6 @@ namespace SearchTool_ServerSide.Migrations
                     b.Navigation("Drug");
                 });
 
-            modelBuilder.Entity("SearchTool_ServerSide.Models.DrugDisease", b =>
-                {
-                    b.HasOne("SearchTool_ServerSide.Models.Disease", "Disease")
-                        .WithMany()
-                        .HasForeignKey("DiseaseId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SearchTool_ServerSide.Models.Drug", "Drug")
-                        .WithMany()
-                        .HasForeignKey("DrugId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SearchTool_ServerSide.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Disease");
-
-                    b.Navigation("Drug");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("SearchTool_ServerSide.Models.DrugDiseaseAddHistory", b =>
                 {
                     b.HasOne("SearchTool_ServerSide.Models.Disease", "Disease")
@@ -1653,7 +1538,7 @@ namespace SearchTool_ServerSide.Migrations
                         .IsRequired();
 
                     b.HasOne("SearchTool_ServerSide.Models.User", "User")
-                        .WithMany()
+                        .WithMany("DrugDiseaseAddHistories")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -1981,25 +1866,6 @@ namespace SearchTool_ServerSide.Migrations
                     b.Navigation("Branch");
                 });
 
-            modelBuilder.Entity("SearchTool_ServerSide.Models.UserDiseaseVisibility", b =>
-                {
-                    b.HasOne("SearchTool_ServerSide.Models.Disease", "Disease")
-                        .WithMany()
-                        .HasForeignKey("DiseaseId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SearchTool_ServerSide.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Disease");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("ServerSide.Models.Script", b =>
                 {
                     b.HasOne("SearchTool_ServerSide.Models.Branch", "Branch")
@@ -2104,6 +1970,8 @@ namespace SearchTool_ServerSide.Migrations
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.User", b =>
                 {
+                    b.Navigation("DrugDiseaseAddHistories");
+
                     b.Navigation("Logs");
 
                     b.Navigation("SearchDrugDetailsLogs");

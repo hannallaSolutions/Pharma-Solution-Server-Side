@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using SearchTool_ServerSide.Authentication;
 using SearchTool_ServerSide.Data;
+using SearchTool_ServerSide.Dtos.Chat;
 using SearchTool_ServerSide.Middleware;
 using SearchTool_ServerSide.Models;
 using SearchTool_ServerSide.Repository;
@@ -85,11 +86,18 @@ builder.Services.AddScoped<FeedbackService>();
 builder.Services.AddScoped<DrugClassService>();
 builder.Services.AddScoped<BranchService>();
 builder.Services.AddScoped<DiseaseService>();
+builder.Services.AddScoped<IChatOrchestratorService, ChatOrchestratorService>();
+
+//////////////////////////////////////////////
+builder.Services.Configure<GeminiOptions>(builder.Configuration.GetSection("Gemini"));
+builder.Services.AddHttpClient<IGeminiChatService, GeminiChatService>(client =>
+{
+    client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
+});
 builder.Services.AddScoped<ScriptsRepository>();
 builder.Services.AddScoped<ScriptsService>();
 
 //////////////////////////////////////////////
-builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddControllers();
 builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
