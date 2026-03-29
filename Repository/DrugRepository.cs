@@ -4760,7 +4760,7 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
             public string? PHARM_CLASSES { get; set; }
         }
 
-        public async Task<ICollection<AuditReadDto>> GetAllLatestScriptsPaginated(int pageNumber, int pageSize, string classVersion = "ClassV6", string matchOn = "BIN")
+        public async Task<ICollection<AuditReadDto>> GetAllLatestScriptsPaginated(int pageNumber, int pageSize, string classVersion = "ClassV6", string matchOn = "BIN",int mainCompanyId=1,int BranchId=1)
         {
             // Use classVersion as part of the cache key
             string cacheKey = $"AllLatestScripts_{classVersion}_{matchOn}";
@@ -4770,7 +4770,7 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
             if (!_cache.TryGetValue(cacheKey, out allData))
             {
                 // Cache miss: Load the entire dataset for this classVersion
-                allData = await GetAuditDtosWithBestBeforeOrPrevMonthAsync(classVersion, matchOn);
+                allData = await GetAuditDtosWithBestBeforeOrPrevMonthAsync(classVersion, matchOn,mainCompanyId,BranchId);
 
                 // Set up cache options (e.g., 120 minutes sliding expiration)
                 var cacheOptions = new MemoryCacheEntryOptions()
@@ -4792,7 +4792,7 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
 
         }
 
-        private async Task<List<AuditReadDto>> GetAuditDtosWithBestBeforeOrPrevMonthAsync(string classTypeName, string matchOn)
+        private async Task<List<AuditReadDto>> GetAuditDtosWithBestBeforeOrPrevMonthAsync(string classTypeName, string matchOn, int mainCompanyId, int branchId)
         {
             var isClassV6 = string.Equals(classTypeName, "ClassV6", StringComparison.OrdinalIgnoreCase);
 
@@ -4804,7 +4804,7 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
                     .ThenInclude(irx => irx.InsurancePCN)
                         .ThenInclude(pcn => pcn.Insurance)
                 .Include(si => si.Prescriber)
-                .Where(si => si.Drug.DrugClasses.Any(dc => dc.ClassInfo.ClassType.Name == classTypeName))
+                .Where(si => si.Script.Branch.MainCompanyId == mainCompanyId  && si.Drug.DrugClasses.Any(dc => dc.ClassInfo.ClassType.Name == classTypeName))
                 .ToListAsync();
 
             if (!scriptItems.Any()) return new();

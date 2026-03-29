@@ -30,13 +30,18 @@ namespace SearchTool_ServerSide.Services
 
         internal async Task<(string accessToken, string refreshToken, string userId, string branchId, string classType)?> Login(UserLoginDto userLoginDto)
         {
-            
+
             var user = await _userRepository.GetUserByEmail(userLoginDto.Email);
             if (user == null)
             {
                 return null;
             }
-            var mainCompany = await _branchRepository.GetMainCompanyByBranchId(user.BranchId); 
+            var mainCompany = await _branchRepository.GetMainCompanyByBranchId(user.BranchId);
+            Console.WriteLine("mainCompany : " + mainCompany);
+            if (mainCompany == null)
+            {
+                return null;
+            }
             if (!BCrypt.Net.BCrypt.Verify(userLoginDto.Password, user.Password))
             {
                 return null;
@@ -46,6 +51,8 @@ namespace SearchTool_ServerSide.Services
                 UserEmail = user.Email,
                 Date = DateTime.UtcNow,
                 Action = "Login",
+                Description = $"User logged in successfully",
+
             };
             await _logRepository.Add(log);
 
@@ -54,6 +61,7 @@ namespace SearchTool_ServerSide.Services
             var refreshToken = TokenGenerate(user, expiresInMinutes: 480);
             var userId = user.Id.ToString();
             var branchId = user.BranchId.ToString();
+            Console.WriteLine("mainCompany.ClassType.Name : " + mainCompany.ClassType.Name + " branchId : " + branchId + " userId : " + userId + " refreshToken : " + refreshToken);
             return (accessToken, refreshToken, userId, branchId, mainCompany.ClassType.Name ?? "ClassV1");
         }
 

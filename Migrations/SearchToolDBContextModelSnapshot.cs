@@ -161,28 +161,6 @@ namespace SearchTool_ServerSide.Migrations
                         });
                 });
 
-            modelBuilder.Entity("SearchTool_ServerSide.Models.Chat", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<bool>("Show")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("TempChat")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Chats", (string)null);
-                });
-
             modelBuilder.Entity("SearchTool_ServerSide.Models.ClassInfo", b =>
                 {
                     b.Property<int>("Id")
@@ -314,7 +292,6 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("Name");
 
-                    b.ToTable("Diseases");
                     b.ToTable("Diseases", (string)null);
                 });
 
@@ -337,7 +314,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("DiseaseVisibilitySettings");
+                    b.ToTable("DiseaseVisibilitySettings", (string)null);
 
                     b.HasData(
                         new
@@ -552,7 +529,7 @@ namespace SearchTool_ServerSide.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("DrugDiseases");
+                    b.ToTable("DrugDiseases", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.DrugDiseaseAddHistory", b =>
@@ -878,39 +855,6 @@ namespace SearchTool_ServerSide.Migrations
                             Name = "Spark Medi-Cal",
                             SpecialtyId = 1
                         });
-                });
-
-            modelBuilder.Entity("SearchTool_ServerSide.Models.Message", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("ChatId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<bool>("Show")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Text")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("Timestamp")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ChatId", "Timestamp");
-
-                    b.ToTable("Messages", (string)null);
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.Order", b =>
@@ -1424,7 +1368,7 @@ namespace SearchTool_ServerSide.Migrations
                     b.HasIndex("UserId", "DiseaseId")
                         .IsUnique();
 
-                    b.ToTable("UserDiseaseVisibility");
+                    b.ToTable("UserDiseaseVisibility", (string)null);
                 });
 
             modelBuilder.Entity("ServerSide.Models.Script", b =>
@@ -1783,17 +1727,6 @@ namespace SearchTool_ServerSide.Migrations
                     b.Navigation("Specialty");
                 });
 
-            modelBuilder.Entity("SearchTool_ServerSide.Models.Message", b =>
-                {
-                    b.HasOne("SearchTool_ServerSide.Models.Chat", "Chat")
-                        .WithMany("Messages")
-                        .HasForeignKey("ChatId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Chat");
-                });
-
             modelBuilder.Entity("SearchTool_ServerSide.Models.OrderItem", b =>
                 {
                     b.HasOne("SearchTool_ServerSide.Models.Drug", "Drug")
@@ -2020,11 +1953,6 @@ namespace SearchTool_ServerSide.Migrations
             modelBuilder.Entity("SearchTool_ServerSide.Models.Branch", b =>
                 {
                     b.Navigation("Users");
-                });
-
-            modelBuilder.Entity("SearchTool_ServerSide.Models.Chat", b =>
-                {
-                    b.Navigation("Messages");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.ClassInfo", b =>

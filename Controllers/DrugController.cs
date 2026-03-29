@@ -13,7 +13,7 @@ using static SearchTool_ServerSide.Repository.DrugRepository;
 namespace SearchTool_ServerSide.Controllers
 {
     [ApiController, Route("drug"), Authorize]
-    public class DrugController(DrugService _drugService, UserAccessToken userAccessToken) : ControllerBase
+    public class DrugController(DrugService _drugService, UserAccessToken userAccessToken,BranchService branchService) : ControllerBase
     {
         [HttpGet, AllowAnonymous]
         public async Task<IActionResult> SaveData()
@@ -272,7 +272,9 @@ namespace SearchTool_ServerSide.Controllers
         [HttpGet("GetAllLatestScriptsPaginated"), Authorize]
         public async Task<IActionResult> GetAllLatestScriptsPaginated([FromQuery] int pageNumber, [FromQuery] int pageSize, [FromQuery] string classVersion = "ClassV1", [FromQuery] string matchOn = "BIN")
         {
-            var items = await _drugService.GetAllLatestScriptsPaginated(pageNumber, pageSize, classVersion, matchOn);
+            var userData = userAccessToken.tokenData();
+            int mainCompanyId = branchService.GetMainCompanyByBranchId(int.Parse(userData.BranchId)).Id;
+            var items = await _drugService.GetAllLatestScriptsPaginated(pageNumber, pageSize, classVersion, matchOn,mainCompanyId,int.Parse(userData.BranchId));
             return Ok(items);
         }
         [HttpGet("GetAllLatestScriptsPaginatedv2"), Authorize]

@@ -9,21 +9,18 @@ namespace SearchTool_ServerSide.Controllers
 {
     [ApiController]
     [Route("scripts")]
-    public class ScriptsController : ControllerBase
+    public class ScriptsController(ScriptsService service, UserAccessToken userAccessToken) : ControllerBase
     {
-        private readonly ScriptsService _service;
 
-        public ScriptsController(ScriptsService service)
-        {
-            _service = service;
-        }
 
         [HttpGet("simple")]
         public async Task<ActionResult<PagedResponse<SimpleScriptDto>>> GetScriptsSimple(
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10)
         {
-            var result = await _service.GetScriptsSimpleAsync(pageNumber, pageSize);
+            var userData = userAccessToken.tokenData();
+
+            var result = await service.GetScriptsSimpleAsync(pageNumber, pageSize,int.Parse(userData.BranchId));
             return Ok(result);
         }
     }

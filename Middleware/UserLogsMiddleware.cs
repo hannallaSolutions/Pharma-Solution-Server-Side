@@ -71,7 +71,10 @@ namespace SearchTool_ServerSide.Middleware
                     {
                         UserEmail = user.Email,
                         Date = DateTime.UtcNow,
-                        Action = "User requested " + endpointName 
+                        Action = "User requested " + endpointName,
+                        Description = $"Method: {method}, Status: {responseStatus}, Path: {requestPath}",
+                        IpAddress = context.Connection.RemoteIpAddress?.ToString() ?? "Unknown",
+                        DeviceInfo = context.Request.Headers["User-Agent"].ToString()
                     };
 
                     dbContext.Logs.Add(log);

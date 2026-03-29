@@ -13,7 +13,7 @@ namespace SearchTool_ServerSide.Services
             _repo = repo;
         }
 
-        public Task<PagedResponse<SimpleScriptDto>> GetScriptsSimpleAsync(int pageNumber, int pageSize)
-            => _repo.GetScriptsSimpleAsync(pageNumber, pageSize);
+        public Task<PagedResponse<SimpleScriptDto>> GetScriptsSimpleAsync(int pageNumber, int pageSize,int branchId)
+            => _repo.GetScriptsSimpleAsync(pageNumber, pageSize,branchId);
     }
 }

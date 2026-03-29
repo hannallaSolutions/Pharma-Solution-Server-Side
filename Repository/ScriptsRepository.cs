@@ -20,13 +20,13 @@ public ScriptsRepository(SearchToolDBContext context)
 
 
 
-        public async Task<PagedResponse<SimpleScriptDto>> GetScriptsSimpleAsync(int pageNumber, int pageSize)
+        public async Task<PagedResponse<SimpleScriptDto>> GetScriptsSimpleAsync(int pageNumber, int pageSize,int branchId)
         {
             if (pageNumber < 1) pageNumber = 1;
             if (pageSize < 1) pageSize = 10;
             if (pageSize > 100) pageSize = 100;
 
-            var baseQuery = _context.Scripts
+            var baseQuery = _context.Scripts.Where(x=>x.BranchId==branchId)
                 .AsNoTracking()
                 .OrderByDescending(s => s.Date);
 
