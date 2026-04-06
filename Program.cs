@@ -106,7 +106,7 @@ builder.Services.AddScoped<ScriptsService>();
 //////////////////////////////////////////////
 builder.Services.AddSwaggerGen();
 builder.Services.AddControllers();
-builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
+builder.Services.AddAutoMapper(cfg => { }, typeof(Program).Assembly);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddMemoryCache();
 

@@ -69,7 +69,7 @@ namespace SearchTool_ServerSide.Controllers
             return Ok(interactions);
         }
 
-        [HttpPost("AddDrugDisease"), Authorize]
+        [HttpPost("AddDrugDisease")]
         [HasPermission("AddDrugToDisease")]
         public async Task<IActionResult> AddDrugDisease([FromBody] DrugDiseaseHistoryAddDto dto)
         {

@@ -9,24 +9,24 @@ using ServerSide.Models;
 
 namespace SearchTool_ServerSide.Repository
 {
-    public class ScriptsRepository 
+    public class ScriptsRepository
     {
         private readonly SearchToolDBContext _context;
-        
-public ScriptsRepository(SearchToolDBContext context) 
+
+        public ScriptsRepository(SearchToolDBContext context)
         {
             _context = context;
         }
 
 
 
-        public async Task<PagedResponse<SimpleScriptDto>> GetScriptsSimpleAsync(int pageNumber, int pageSize,int branchId)
+        public async Task<PagedResponse<SimpleScriptDto>> GetScriptsSimpleAsync(int pageNumber, int pageSize, int branchId)
         {
             if (pageNumber < 1) pageNumber = 1;
             if (pageSize < 1) pageSize = 10;
             if (pageSize > 100) pageSize = 100;
 
-            var baseQuery = _context.Scripts.Where(x=>x.BranchId==branchId)
+            var baseQuery = _context.Scripts.Where(x => x.BranchId == branchId)
                 .AsNoTracking()
                 .OrderByDescending(s => s.Date);
 
@@ -69,12 +69,12 @@ public ScriptsRepository(SearchToolDBContext context)
                         DrugName = i.Drug.Name,
 
                         InsuranceId = i.InsuranceId,
-                      //  InsuranceName = i.Insurance.Name,
-                       // InsuranceName = null,
-InsuranceName =
-    i.Insurance.InsurancePCN != null && i.Insurance.InsurancePCN.Insurance != null
-        ? i.Insurance.InsurancePCN.Insurance.Name
-        : null,
+                        //  InsuranceName = i.Insurance.Name,
+                        // InsuranceName = null,
+                        InsuranceName =
+                        i.Insurance.InsurancePCN != null && i.Insurance.InsurancePCN.Insurance != null
+                            ? i.Insurance.InsurancePCN.Insurance.Name
+                            : null,
 
 
 

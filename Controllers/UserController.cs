@@ -30,7 +30,7 @@ namespace SearchTool_ServerSide.Controllers
         }
 
 
-        [HttpPost("login")]
+        [HttpPost("login"),AllowAnonymous]
         public async Task<IActionResult> Login(UserLoginDto userLoginDto)
         {
             var tokens = await _userService.Login(userLoginDto);
