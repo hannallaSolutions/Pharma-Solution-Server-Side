@@ -65,13 +65,13 @@ namespace SearchTool_ServerSide.Services
         {
             await _insuranceRepository.ReportStatus(request, userEmail);
         }
-        internal async Task<IEnumerable<Report>> GetReportsAsyncByKey(string sourceDrugNDC, string targetDrugNDC, int insuranceRxId)
+        internal async Task<IEnumerable<Report>> GetReportsAsyncByKey(string sourceDrugNDC, string targetDrugNDC, int insuranceRxId, int branchId = 1)
         {
-            return await _insuranceRepository.GetReportsAsyncByKey(sourceDrugNDC, targetDrugNDC, insuranceRxId);
+            return await _insuranceRepository.GetReportsAsyncByKey(sourceDrugNDC, targetDrugNDC, insuranceRxId,branchId : branchId);
         }
-        internal async Task<IEnumerable<Report>> GetReportsAsyncByTargetNDC(string targetDrugNDC, int insuranceRxId)
+        internal async Task<IEnumerable<Report>> GetReportsAsyncByTargetNDC(string targetDrugNDC, int insuranceRxId, int branchId = 1)
         {
-            return await _insuranceRepository.GetReportsAsyncByTargetNDC(targetDrugNDC, insuranceRxId);
+            return await _insuranceRepository.GetReportsAsyncByTargetNDC(targetDrugNDC, insuranceRxId, branchId: branchId);
         }
         internal async Task<bool> CheckInsuranceAvailability(CustomAddDrugInsuranceRequest request)
         {

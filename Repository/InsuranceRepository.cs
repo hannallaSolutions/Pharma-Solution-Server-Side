@@ -152,9 +152,9 @@ namespace SearchTool_ServerSide.Repository
                 // PA mapping (adds "Refile" alongside Yes/No)
                 status.PriorAuthorizationStatus = inputStatus switch
                 {
-                    "PriorAuthorizationYes" => "Yes",
-                    "PriorAuthorizationNo" => "No",
-                    "PriorAuthorizationRefile" => "Refile",
+                    "Prior Authorization Yes" => "Yes",
+                    "Prior Authorization No" => "No",
+                    "Prior Authorization Refile" => "Refile",
                     _ => status.PriorAuthorizationStatus ?? "NA"
                 };
             }
@@ -176,19 +176,19 @@ namespace SearchTool_ServerSide.Repository
             await _context.SaveChangesAsync(ct);
         }
 
-        internal async Task<IEnumerable<Report>> GetReportsAsyncByKey(string sourceDrugNDC, string TargetDrugNDC, int insuranceRxId, CancellationToken ct = default, int pageSize = 3)
+        internal async Task<IEnumerable<Report>> GetReportsAsyncByKey(string sourceDrugNDC, string TargetDrugNDC, int insuranceRxId, CancellationToken ct = default, int pageSize = 3,int branchId = 1)
         {
             return await _context.Reports
-                .Where(r => r.SourceDrugNDC == sourceDrugNDC && r.TargetDrugNDC == TargetDrugNDC && r.InsuranceRxId == insuranceRxId)
+                .Where(r => r.SourceDrugNDC == sourceDrugNDC && r.TargetDrugNDC == TargetDrugNDC && r.InsuranceRxId == insuranceRxId && r.User.BranchId == branchId)
                 .OrderByDescending(r => r.StatusDate)
                 .Skip(0)
                 .Take(pageSize)
                 .ToListAsync(ct);
         }
-        internal async Task<IEnumerable<Report>> GetReportsAsyncByTargetNDC(string targetDrugNDC, int insuranceRxId, CancellationToken ct = default, int pageSize = 3)
+        internal async Task<IEnumerable<Report>> GetReportsAsyncByTargetNDC(string targetDrugNDC, int insuranceRxId, CancellationToken ct = default, int pageSize = 3, int branchId = 1)
         {
             return await _context.Reports
-                .Where(r => r.TargetDrugNDC == targetDrugNDC && r.InsuranceRxId == insuranceRxId)
+                .Where(r => r.TargetDrugNDC == targetDrugNDC && r.InsuranceRxId == insuranceRxId && r.User.BranchId==branchId)
                 .OrderByDescending(r => r.StatusDate)
                 .Skip(0)
                 .Take(pageSize)

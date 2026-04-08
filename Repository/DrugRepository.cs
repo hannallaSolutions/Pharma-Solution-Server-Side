@@ -3257,7 +3257,7 @@ namespace SearchTool_ServerSide.Repository
             var allItems2 = await _context.DrugInsurances.Include(x => x.Drug).Where(x => x.Drug.Name == drugName && x.ScriptCode != null).Select(x => x.NDCCode).ToListAsync();
             return (new List<string>(), allItems2);
         }
-        internal async Task<DrugsAlternativesReadDto?> GetDetails(string ndc, int sourceInsuranceId, int? insuranceId = null)
+        internal async Task<DrugsAlternativesReadDto?> GetDetails(string ndc, int sourceInsuranceId, int? insuranceId = null,int branchId=1)
         {
             if (insuranceId == 0) insuranceId = null;
 
@@ -3319,28 +3319,55 @@ namespace SearchTool_ServerSide.Repository
             int effectiveInsuranceRxId = chosen.DrugInsurance.InsuranceId;
 
             // Fetch ALL statuses for this InsuranceRx + NDC (with reports)
+            // Fetch ALL statuses for this InsuranceRx + NDC (with reports + users)
             var statuses = await _context.InsuranceStatuses
                 .Where(s => s.InsuranceRxId == sourceInsuranceId && s.TargetDrugNDC == ndc)
                 .Include(s => s.Reports)
+                    .ThenInclude(r => r.User)
                 .AsNoTracking()
                 .ToListAsync();
 
+            IEnumerable<Report> BranchReports(InsuranceStatus s) =>
+                s.Reports?
+                    .Where(r => r.User != null && r.User.BranchId == branchId)
+                ?? Enumerable.Empty<Report>();
+
             DateTime LatestReportDate(InsuranceStatus s) =>
-                s.Reports?.OrderByDescending(r => r.StatusDate).Select(r => r.StatusDate).FirstOrDefault()
-                ?? DateTime.MinValue;
+                BranchReports(s)
+                    .OrderByDescending(r => r.StatusDate)
+                    .Select(r => r.StatusDate)
+                    .FirstOrDefault();
 
             var latestPAStatusRow = statuses
-                .Where(s => !string.IsNullOrEmpty(s.PriorAuthorizationStatus) && s.PriorAuthorizationStatus != "NA")
-                .Select(s => new { Row = s, Latest = LatestReportDate(s) })
-                .OrderByDescending(x => x.Latest).Select(x => x.Row).FirstOrDefault();
+                .Where(s =>
+                    !string.IsNullOrEmpty(s.PriorAuthorizationStatus) &&
+                    s.PriorAuthorizationStatus != "NA" &&
+                    BranchReports(s).Any())
+                .Select(s => new
+                {
+                    Row = s,
+                    Latest = LatestReportDate(s)
+                })
+                .OrderByDescending(x => x.Latest)
+                .Select(x => x.Row)
+                .FirstOrDefault();
 
             var latestApprovedStatusRow = statuses
-                .Where(s => !string.IsNullOrEmpty(s.ApprovedStatus) && s.ApprovedStatus != "NA")
-                .Select(s => new { Row = s, Latest = LatestReportDate(s) })
-                .OrderByDescending(x => x.Latest).Select(x => x.Row).FirstOrDefault();
+                .Where(s =>
+                    !string.IsNullOrEmpty(s.ApprovedStatus) &&
+                    s.ApprovedStatus != "NA" &&
+                    BranchReports(s).Any())
+                .Select(s => new
+                {
+                    Row = s,
+                    Latest = LatestReportDate(s)
+                })
+                .OrderByDescending(x => x.Latest)
+                .Select(x => x.Row)
+                .FirstOrDefault();
 
             var latestReport = statuses
-                .SelectMany(s => s.Reports ?? Enumerable.Empty<Report>())
+                .SelectMany(s => BranchReports(s))
                 .OrderByDescending(r => r.StatusDate)
                 .FirstOrDefault();
 
@@ -3998,7 +4025,7 @@ public async Task<PagedResult<DrugsAlternativesReadDto>> GetAlternativesWithInsu
     string? rxgroup = null,
     string? pcn = null,
     string? bin = null,
-    string? diseaseName = null)
+    string? diseaseName = null,int branchId = 1)
 {
     if (pageNumber < 1) pageNumber = 1;
     if (pageSize <= 0) pageSize = 10;
@@ -4062,7 +4089,7 @@ public async Task<PagedResult<DrugsAlternativesReadDto>> GetAlternativesWithInsu
             _context.DrugAlternativeReports
                 .Where(r => r.SourceDrugNDC == sourceDrugNDC
                             && r.TargetDrugNDC == di.NDCCode
-                            && r.ClassInfoId == br.Ci.Id)
+                            && r.ClassInfoId == br.Ci.Id && r.User.BranchId==branchId)
                 .OrderByDescending(r => r.StatusDate)
                 .ThenByDescending(r => r.Id)
                 .FirstOrDefault()
@@ -4070,7 +4097,7 @@ public async Task<PagedResult<DrugsAlternativesReadDto>> GetAlternativesWithInsu
             _context.Reports.Include(r => r.InsuranceStatus)
                 .Where(r =>
                     r.TargetDrugNDC == di.NDCCode &&
-                    r.InsuranceRxId == sourceRxGroupId)
+                    r.InsuranceRxId == sourceRxGroupId && r.User.BranchId==branchId)
                 .OrderByDescending(r => r.StatusDate)
                 .ThenByDescending(r => r.Id)
                 .FirstOrDefault()
@@ -4441,7 +4468,7 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
     int rxgroupId,
     string sourceDrugNDC,
     int pageNumber = 1,
-    int pageSize = 10)
+    int pageSize = 10, int branchId = 0)
         {
             if (pageNumber < 1) pageNumber = 1;
             if (pageSize <= 0) pageSize = 10;
@@ -4536,7 +4563,7 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
                     _context.DrugAlternativeReports
                         .Where(r => r.SourceDrugNDC == sourceDrugNDC
                                     && r.TargetDrugNDC == br.D.NDC
-                                    && r.ClassInfoId == br.Ci.Id)
+                                    && r.ClassInfoId == br.Ci.Id && r.User.BranchId==branchId)  
                         .OrderByDescending(r => r.StatusDate)
                         .ThenByDescending(r => r.Id)
                         .FirstOrDefault()
@@ -4544,7 +4571,7 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
                     _context.Reports.Include(r => r.InsuranceStatus)
                         .Where(r =>
                             r.TargetDrugNDC == br.D.NDC &&
-                            r.InsuranceRxId == rxgroupId)
+                            r.InsuranceRxId == rxgroupId && r.User.BranchId == branchId)
                         .OrderByDescending(r => r.StatusDate)
                         .ThenByDescending(r => r.Id)
                         .FirstOrDefault()

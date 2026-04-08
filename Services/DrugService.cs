@@ -74,9 +74,9 @@ namespace SearchTool_ServerSide.Services
             return item;
         }
 
-        internal async Task<DrugsAlternativesReadDto> GetDetails(string ndc, int sourceInsuranceId, int? insuranceId)
+        internal async Task<DrugsAlternativesReadDto> GetDetails(string ndc, int sourceInsuranceId, int? insuranceId,int branchId)
         {
-            var item = await _drugRepository.GetDetails(ndc, sourceInsuranceId, insuranceId);
+            var item = await _drugRepository.GetDetails(ndc, sourceInsuranceId, insuranceId,branchId);
             return item;
         }
 
@@ -299,10 +299,11 @@ namespace SearchTool_ServerSide.Services
         string? rxgroup = null,
         string? pcn = null,
         string? bin = null,
-        string? diseaseName = null)
+        string? diseaseName = null,
+        int branchId = 1)
         {
             return await _drugRepository.GetAlternativesWithInsurance(classInfoId, 
-            sourceDrugNDC, sourceRxGroupId, matchedRx, pageNumber, pageSize, rxgroup, pcn, bin, diseaseName);
+            sourceDrugNDC, sourceRxGroupId, matchedRx, pageNumber, pageSize, rxgroup, pcn, bin, diseaseName, branchId);
         }
         internal async Task<AlternativesFilterOptionsDto> GetAlternativesWithInsuranceFilters(int classInfoId, string sourceDrugNDC, string? rxgroup = null, string? pcn = null, string? bin = null)
         {
@@ -313,9 +314,9 @@ namespace SearchTool_ServerSide.Services
             int rxgroupId,
             string sourceDrugNDC,
             int pageNumber = 1,
-            int pageSize = 10)
+            int pageSize = 10, int branchId = 0)
         {
-            return await _drugRepository.GetAlternativesNoInsurancePaged(classInfoId, rxgroupId, sourceDrugNDC, pageNumber, pageSize);
+            return await _drugRepository.GetAlternativesNoInsurancePaged(classInfoId, rxgroupId, sourceDrugNDC, pageNumber, pageSize, branchId);
         }
         internal async Task<(ICollection<string> InsuranceNDC, ICollection<string> AllInsuranceNDC)> GetDrugInsuranceNDCS(string drugName, int? insuranceId)
         {

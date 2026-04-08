@@ -104,17 +104,12 @@ namespace SearchTool_ServerSide.Controllers
         [HttpGet("GetDetails"), AllowAnonymous]
         public async Task<IActionResult> GetDetails([FromQuery] string ndc, [FromQuery] int sourceInsuranceId, [FromQuery] int? insuranceId = 0)
         {
-            // Console.WriteLine("NDC: " + ndc + " InsuranceId: " + insuranceId);
-            // Console.ReadKey();
-            var items = await _drugService.GetDetails(ndc, sourceInsuranceId, insuranceId);
+            var tokenData = userAccessToken.tokenData();
+
+            var items = await _drugService.GetDetails(ndc, sourceInsuranceId, insuranceId,int.Parse(tokenData.BranchId));
             return Ok(items);
         }
-        // [HttpGet("getDrugNDCsByNameInsuance")]
-        // public async Task<IActionResult> getDrugNDCsByNameInsuance([FromQuery] string drugName, [FromQuery] int insurnaceId)
-        // {
-        //     var items = await _drugService.getDrugNDCsByNameInsuance(drugName, insurnaceId);
-        //     return Ok(items);
-        // }
+
         [HttpGet("GetClassById")]
         public async Task<IActionResult> getClassbyId([FromQuery] int id)
         {
@@ -356,9 +351,10 @@ namespace SearchTool_ServerSide.Controllers
             [FromQuery] string? diseaseName = null
             )
         {
+            var tokenData = userAccessToken.tokenData();
             var items = await _drugService.GetAlternativesWithInsurance(
                 classInfoId, sourceDrugNDC, sourceRxGroupId, matchedRx, pageNumber,
-                 pageSize, rxgroup, pcn, bin, diseaseName);
+                 pageSize, rxgroup, pcn, bin, diseaseName,int.Parse(tokenData.BranchId));
             return Ok(items);
         }
         [HttpGet("GetAlternativesWithInsuranceFilters"), AllowAnonymous]
@@ -382,7 +378,9 @@ namespace SearchTool_ServerSide.Controllers
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10)
         {
-            var result = await _drugService.GetAlternativesNoInsurancePaged(classInfoId, rxgroupId, sourceDrugNDC, pageNumber, pageSize);
+            var tokenData = userAccessToken.tokenData();
+
+            var result = await _drugService.GetAlternativesNoInsurancePaged(classInfoId, rxgroupId, sourceDrugNDC, pageNumber, pageSize, int.Parse(tokenData.BranchId));
             return Ok(result);
         }
         [HttpGet("GetDrugInsuranceNDCS")]

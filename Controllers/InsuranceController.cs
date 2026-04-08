@@ -84,13 +84,17 @@ namespace SearchTool_ServerSide.Controllers
         [HttpGet("GetReportsAsyncByKey"), AllowAnonymous]
         public async Task<IActionResult> GetReportsAsyncByKey([FromQuery] string sourceDrugNDC, [FromQuery] string targetDrugNDC, [FromQuery] int insuranceRxId)
         {
-            var items = await _insuranceService.GetReportsAsyncByKey(sourceDrugNDC, targetDrugNDC, insuranceRxId);
+            var tokenData = userAccessToken.tokenData();
+
+            var items = await _insuranceService.GetReportsAsyncByKey(sourceDrugNDC, targetDrugNDC, insuranceRxId,branchId: int.Parse(tokenData.BranchId));
             return Ok(items);
         }
         [HttpGet("GetReportsAsyncByTargetNDC"), AllowAnonymous]
         public async Task<IActionResult> GetReportsAsyncByTargetNDC([FromQuery] string targetDrugNDC, [FromQuery] int insuranceRxId)
         {
-            var items = await _insuranceService.GetReportsAsyncByTargetNDC(targetDrugNDC, insuranceRxId);
+            var tokenData = userAccessToken.tokenData();
+
+            var items = await _insuranceService.GetReportsAsyncByTargetNDC(targetDrugNDC, insuranceRxId, branchId: int.Parse(tokenData.BranchId));
             return Ok(items);
         }
         [HttpPost("CheckInsuranceAvailability")]
