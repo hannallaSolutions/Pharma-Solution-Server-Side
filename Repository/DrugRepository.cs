@@ -4787,17 +4787,17 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
             public string? PHARM_CLASSES { get; set; }
         }
 
-        public async Task<ICollection<AuditReadDto>> GetAllLatestScriptsPaginated(int pageNumber, int pageSize, string classVersion = "ClassV6", string matchOn = "BIN",int mainCompanyId=1,int BranchId=1)
+        public async Task<ICollection<AuditReadDto>> GetAllLatestScriptsPaginated(int pageNumber, int pageSize, string classVersion = "ClassV6", string matchOn = "BIN",int mainCompanyId=1,int branchId=0)
         {
             // Use classVersion as part of the cache key
-            string cacheKey = $"AllLatestScripts_{classVersion}_{matchOn}";
+            string cacheKey = $"AllLatestScripts_{classVersion}_{matchOn}_{branchId}";
             List<AuditReadDto> allData;
 
             // Try to get the specific classVersion from the cache
-            if (!_cache.TryGetValue(cacheKey, out allData))
+            if (!_cache.TryGetValue(cacheKey, out allData) && branchId!=0)
             {
                 // Cache miss: Load the entire dataset for this classVersion
-                allData = await GetAuditDtosWithBestBeforeOrPrevMonthAsync(classVersion, matchOn,mainCompanyId,BranchId);
+                allData = await GetAuditDtosWithBestBeforeOrPrevMonthAsync(classVersion, matchOn,mainCompanyId,branchId);
 
                 // Set up cache options (e.g., 120 minutes sliding expiration)
                 var cacheOptions = new MemoryCacheEntryOptions()

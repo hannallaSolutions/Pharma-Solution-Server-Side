@@ -27,13 +27,14 @@ namespace SearchTool_ServerSide.Repository
 
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                INSERT INTO ""MainCompanies"" (""Name"", ""SpecialtyId"")
-                VALUES (@name, @specialtyId)
-                RETURNING ""Id"", ""Name"", ""SpecialtyId"";
-            ";
+        INSERT INTO ""MainCompanies"" (""Name"", ""SpecialtyId"", ""ClassTypeId"")
+        VALUES (@name, @specialtyId, @classTypeId)
+        RETURNING ""Id"", ""Name"", ""SpecialtyId"", ""ClassTypeId"";
+    ";
 
             cmd.Parameters.Add(new NpgsqlParameter("@name", mainCompany.Name));
             cmd.Parameters.Add(new NpgsqlParameter("@specialtyId", mainCompany.SpecialtyId));
+            cmd.Parameters.Add(new NpgsqlParameter("@classTypeId", mainCompany.ClassTypeId ?? 2));
 
             await using var reader = await cmd.ExecuteReaderAsync();
 
@@ -43,7 +44,8 @@ namespace SearchTool_ServerSide.Repository
                 {
                     Id = reader.GetInt32(0),
                     Name = reader.GetString(1),
-                    SpecialtyId = reader.GetInt32(2)
+                    SpecialtyId = reader.GetInt32(2),
+                    ClassTypeId = reader.IsDBNull(3) ? null : reader.GetInt32(3)
                 };
             }
 

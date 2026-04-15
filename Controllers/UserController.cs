@@ -55,7 +55,7 @@ namespace SearchTool_ServerSide.Controllers
         {
             return Ok("Authorized");
         }
-        [HttpPost("access-token")]
+        [HttpPost("access-token"),AllowAnonymous]
         public async Task<IActionResult> GenerateToken()
         {
             // Get refresh token from cookies
@@ -68,13 +68,13 @@ namespace SearchTool_ServerSide.Controllers
             // Validate and extract user from refresh token
             Console.WriteLine("refresh token: " + refreshToken);
             var user = userAccessToken.ValidateRefreshToken(refreshToken);
-            if (user == null)
+            if (user == null || user.UserId==null)
             {
                 return Unauthorized("Invalid refresh token");
             }
 
             // Generate new access & refresh tokens
-            var tokens = await _userService.Refresh(user.Email);
+            var tokens = await _userService.Refresh(int.Parse(user.UserId));
             if (tokens == null)
             {
                 return BadRequest("Failed to refresh token");

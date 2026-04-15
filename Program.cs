@@ -1,18 +1,19 @@
-using System.Text;
-using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using SearchTool_ServerSide.Authentication;
+using SearchTool_ServerSide.Authorization;
 using SearchTool_ServerSide.Data;
 using SearchTool_ServerSide.Dtos.Chat;
+using SearchTool_ServerSide.Logging;
 using SearchTool_ServerSide.Middleware;
 using SearchTool_ServerSide.Models;
 using SearchTool_ServerSide.Repository;
 using SearchTool_ServerSide.Services;
 using ServerSide;
-using Microsoft.AspNetCore.Authorization;
-using SearchTool_ServerSide.Authorization;
+using System.Text;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>();
@@ -114,6 +115,8 @@ builder.Services.AddMemoryCache();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionHandler>();
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
 builder.Services.AddAuthorization();
+builder.Services.AddSingleton<IUserLogQueue, UserLogQueue>();
+builder.Services.AddHostedService<UserLogBackgroundService>();
 
 var allowedOrigins = new List<string>
 {
@@ -150,7 +153,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-// app.UseCors("CorsPolicy");
+app.UseCors("CorsPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<UserLogsMiddleware>();

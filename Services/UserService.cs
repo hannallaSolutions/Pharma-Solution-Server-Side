@@ -102,10 +102,9 @@ namespace SearchTool_ServerSide.Services
             return userReadDto;
         }
 
-        public async Task<(string accessToken, string refreshToken, string userId)?> Refresh(string email)
-        {
-            Console.WriteLine("email : " + email);
-            var user = await _userRepository.GetUserByEmail(email);
+        public async Task<(string accessToken, string refreshToken, string userId)?> Refresh(int userId)
+        { 
+            var user = await _userRepository.GetById(userId);
             if (user == null)
             {
                 return null;
@@ -114,8 +113,7 @@ namespace SearchTool_ServerSide.Services
             var accessToken = TokenGenerate(user, expiresInMinutes: 1);
             // Refresh token now valid for 8 hours
             var refreshToken = TokenGenerate(user, expiresInMinutes: 480);
-            var userId = user.Id.ToString();
-            return (accessToken, refreshToken, userId);
+            return (accessToken, refreshToken, userId.ToString());
         }
 
         internal async Task<UserReadDto> UserUpdate(int userId, UserUpdateDto userUpdateDto)
