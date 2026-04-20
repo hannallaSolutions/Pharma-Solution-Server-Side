@@ -37,13 +37,17 @@ namespace SearchTool_ServerSide.Repository
         private readonly SearchToolDBContext _context;
         private readonly IMapper _mapper;
         private readonly IMemoryCache _cache;
+        private const int DemoDrugLimit = 1000;
+        private const int DemoPageSizeLimit = 10;
+        private const int DemoPageNumberLimit = 1;
+
         public DrugRepository(SearchToolDBContext context, IMapper mapper, IMemoryCache cache) : base(context)
         {
             _context = context;
             _mapper = mapper;
             _cache = cache;
         }
-        public async Task<ICollection<Drug>> GetDrugsByName(string query, int page = 1, int pageSize = 20)
+        public async Task<ICollection<Drug>> GetDrugsByName(string query, int page = 1, int pageSize = 20, bool isDemo = false)
         {
             int offset = (page - 1) * pageSize;
 
@@ -51,42 +55,47 @@ namespace SearchTool_ServerSide.Repository
             await _context.Database.ExecuteSqlRawAsync("SET pg_trgm.similarity_threshold = 0.3;");
 
             var sql = @"
-                    WITH ranked AS (
-                        SELECT *,
-                            ROW_NUMBER() OVER (
-                                PARTITION BY name_unaccent
-                                ORDER BY 
-                                    (
-                                        similarity(name_unaccent, unaccent({0})) * 0.5 +
-                                        ts_rank(name_tsv, plainto_tsquery(unaccent({0}))) * 0.3 +
-                                        CASE WHEN name_soundex = soundex(unaccent({0})) THEN 0.1 ELSE 0 END +
-                                        CASE WHEN name_unaccent ILIKE '%' || unaccent({0}) || '%' THEN 0.1 ELSE 0 END
-                                    ) DESC
-                            ) AS rn,
-                            similarity(name_unaccent, unaccent({0})) AS sim,
-                            ts_rank(name_tsv, plainto_tsquery(unaccent({0}))) AS ts_rank,
-                            soundex(name_unaccent) AS sndx
-                        FROM ""Drugs""
-                        WHERE name_unaccent % unaccent({0})
-                        OR name_tsv @@ plainto_tsquery(unaccent({0}))
-                        OR name_soundex = soundex(unaccent({0}))
-                        OR name_unaccent ILIKE '%' || unaccent({0}) || '%'
-                    )
-                    SELECT *
-                    FROM ranked
-                    WHERE rn = 1
-                    ORDER BY sim DESC, ts_rank DESC
-                    LIMIT {1} OFFSET {2};
-                    ";
+        WITH source_drugs AS (
+            SELECT *
+            FROM ""Drugs""
+            ORDER BY ""Id""
+            LIMIT CASE WHEN {3} THEN {4} ELSE 2147483647 END
+        ),
+        ranked AS (
+            SELECT *,
+                ROW_NUMBER() OVER (
+                    PARTITION BY name_unaccent
+                    ORDER BY 
+                        (
+                            similarity(name_unaccent, unaccent({0})) * 0.5 +
+                            ts_rank(name_tsv, plainto_tsquery(unaccent({0}))) * 0.3 +
+                            CASE WHEN name_soundex = soundex(unaccent({0})) THEN 0.1 ELSE 0 END +
+                            CASE WHEN name_unaccent ILIKE '%' || unaccent({0}) || '%' THEN 0.1 ELSE 0 END
+                        ) DESC
+                ) AS rn,
+                similarity(name_unaccent, unaccent({0})) AS sim,
+                ts_rank(name_tsv, plainto_tsquery(unaccent({0}))) AS ts_rank,
+                soundex(name_unaccent) AS sndx
+            FROM source_drugs
+            WHERE name_unaccent % unaccent({0})
+               OR name_tsv @@ plainto_tsquery(unaccent({0}))
+               OR name_soundex = soundex(unaccent({0}))
+               OR name_unaccent ILIKE '%' || unaccent({0}) || '%'
+        )
+        SELECT *
+        FROM ranked
+        WHERE rn = 1
+        ORDER BY sim DESC, ts_rank DESC
+        LIMIT {1} OFFSET {2};
+    ";
 
             var results = await _context.Drugs
-                .FromSqlRaw(sql, query, pageSize, offset)
+                .FromSqlRaw(sql, query, pageSize, offset, isDemo, DemoDrugLimit)
                 .AsNoTracking()
                 .ToListAsync();
 
             return results;
         }
-
 
         public async Task<ICollection<DrugModal>> GetClassesByName(
             string name,
@@ -3432,8 +3441,13 @@ namespace SearchTool_ServerSide.Repository
             return items;
         }
 
-        private async Task<ICollection<DrugsAlternativesReadDto>> GetAllDrugsAlternativesDynamic(int classTypeId, string sourceDrugNDC, int pageNumber, int pageSize)
+        private async Task<ICollection<DrugsAlternativesReadDto>> GetAllDrugsAlternativesDynamic(int classTypeId, string sourceDrugNDC, int pageNumber, int pageSize,bool isDemo = false)
         {
+            if (isDemo)
+            {
+                pageNumber = DemoPageNumberLimit;
+                pageSize = DemoPageSizeLimit;
+            }
             // 1) Find the source drug
             var sourceDrug = await _context.Drugs
                 .AsNoTracking()
@@ -3581,8 +3595,13 @@ namespace SearchTool_ServerSide.Repository
             return result;
         }
 
-        internal async Task<ICollection<DrugsAlternativesReadDto>> GetAllDrugs(int classInfoId, string sourceDrugNDC, int pageNumber, int pageSize)
+        internal async Task<ICollection<DrugsAlternativesReadDto>> GetAllDrugs(int classInfoId, string sourceDrugNDC, int pageNumber, int pageSize,bool isDemo = false)
         {
+            if (isDemo)
+            {
+                pageNumber = DemoPageNumberLimit;
+                pageSize = DemoPageSizeLimit;
+            }
             var tempCLass = await _context.ClassInfos.FirstOrDefaultAsync(x => x.Id == classInfoId);
             if (tempCLass.ClassTypeId >= 7)
             {
@@ -4025,13 +4044,17 @@ public async Task<PagedResult<DrugsAlternativesReadDto>> GetAlternativesWithInsu
     string? rxgroup = null,
     string? pcn = null,
     string? bin = null,
-    string? diseaseName = null,int branchId = 1)
+    string? diseaseName = null,int branchId = 1,bool isDemo = false)
 {
     if (pageNumber < 1) pageNumber = 1;
     if (pageSize <= 0) pageSize = 10;
     if (pageSize > 100) pageSize = 100;
-
-    var classInfo = await _context.ClassInfos.AsNoTracking()
+            if (isDemo)
+            {
+                pageNumber = DemoPageNumberLimit;
+                pageSize = DemoPageSizeLimit;
+            }
+            var classInfo = await _context.ClassInfos.AsNoTracking()
         .FirstOrDefaultAsync(ci => ci.Id == classInfoId);
     if (classInfo == null) return EmptyPage(pageNumber, pageSize);
 
@@ -4272,8 +4295,8 @@ if (!string.IsNullOrWhiteSpace(diseaseName))
             .ToList();
     }
 
-    var totalCount = grouped.Count;
-    var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+    var totalCount = isDemo==false ?grouped.Count :DemoPageSizeLimit ;
+    var totalPages = isDemo==false?(int)Math.Ceiling(totalCount / (double)pageSize): DemoPageNumberLimit;
     var skip = (pageNumber - 1) * pageSize;
     var items = grouped.Skip(skip).Take(pageSize).ToList();
 
@@ -4468,11 +4491,15 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
     int rxgroupId,
     string sourceDrugNDC,
     int pageNumber = 1,
-    int pageSize = 10, int branchId = 0)
+    int pageSize = 10, int branchId = 0,bool isDemo = false)
         {
             if (pageNumber < 1) pageNumber = 1;
             if (pageSize <= 0) pageSize = 10;
-
+            if (isDemo)
+            {
+                pageNumber = DemoPageNumberLimit;
+                pageSize = DemoPageSizeLimit;
+            }
             var classInfo = await _context.ClassInfos.AsNoTracking()
                 .FirstOrDefaultAsync(ci => ci.Id == classInfoId);
 
@@ -4634,8 +4661,8 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
                 .ThenByDescending(x => x.Stock)
                 .ToList();
 
-            var totalCount = dedup.Count;
-            var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+            var totalCount = isDemo == false ? dedup.Count : DemoPageSizeLimit;
+            var totalPages = isDemo==false ?  (int)Math.Ceiling(totalCount / (double)pageSize) : DemoPageNumberLimit;
             var skip = (pageNumber - 1) * pageSize;
 
             return new PagedResult<DrugAlternativeLiteDto>
@@ -5404,8 +5431,9 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
         }
 
 
+
         internal async Task<ICollection<Drug>> GetDrugsByInsuranceNamePaginated(
-          string insurance, string drugName, int pageSize, int pageNumber)
+            string insurance, string drugName, int pageSize, int pageNumber, bool isDemo = false)
         {
             // Normalize paging
             pageSize = Math.Max(pageSize, 1);
@@ -5416,7 +5444,6 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
             await _context.Database.ExecuteSqlRawAsync("SET pg_trgm.similarity_threshold = 0.3;");
 
             // Decide limited-by-RxGroup or global:
-            // We only "limit" if there exists at least one DrugInsurance with this RxGroup AND ScriptCode present.
             bool useGlobal = string.IsNullOrWhiteSpace(insurance);
             if (!useGlobal)
             {
@@ -5432,13 +5459,20 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
                         x.ScriptCode != string.Empty);
             }
 
+            int demoLimit = isDemo ? DemoDrugLimit : int.MaxValue;
+
             FormattableString sql;
 
             if (useGlobal)
             {
-                // GLOBAL: only drugs that have at least one DrugInsurance with a non-empty ScriptCode
                 sql = $@"
-WITH ranked AS (
+WITH source_drugs AS (
+    SELECT *
+    FROM ""Drugs""
+    ORDER BY ""Id""
+    LIMIT {demoLimit}
+),
+ranked AS (
     SELECT d.*,
            ROW_NUMBER() OVER (
                ORDER BY (
@@ -5450,7 +5484,7 @@ WITH ranked AS (
            ) AS rn,
            similarity(d.""name_unaccent"", unaccent({drugName})) AS sim,
            ts_rank(d.""name_tsv"", plainto_tsquery(unaccent({drugName}))) AS ts_rank
-    FROM ""Drugs"" d
+    FROM source_drugs d
     WHERE
         (
             d.""name_unaccent"" % unaccent({drugName}) OR
@@ -5473,9 +5507,14 @@ LIMIT {pageSize} OFFSET {offset};";
             }
             else
             {
-                // LIMITED by RxGroup: still require ScriptCode present, and RxGroup matches
                 sql = $@"
-WITH ranked AS (
+WITH source_drugs AS (
+    SELECT *
+    FROM ""Drugs""
+    ORDER BY ""Id""
+    LIMIT {demoLimit}
+),
+ranked AS (
     SELECT d.*,
            ROW_NUMBER() OVER (
                ORDER BY (
@@ -5487,7 +5526,7 @@ WITH ranked AS (
            ) AS rn,
            similarity(d.""name_unaccent"", unaccent({drugName})) AS sim,
            ts_rank(d.""name_tsv"", plainto_tsquery(unaccent({drugName}))) AS ts_rank
-    FROM ""Drugs"" d
+    FROM source_drugs d
     WHERE
         (
             d.""name_unaccent"" % unaccent({drugName}) OR
@@ -5511,17 +5550,21 @@ ORDER BY sim DESC, ts_rank DESC
 LIMIT {pageSize} OFFSET {offset};";
             }
 
-            // Execute safely with parameters
             var drugs = await _context.Drugs
                 .FromSqlInterpolated(sql)
                 .AsNoTracking()
                 .ToListAsync();
 
-            // Safety net: if limited query unexpectedly returns zero (race), fallback once.
             if (!useGlobal && drugs.Count == 0)
             {
                 FormattableString fallbackSql = $@"
-WITH ranked AS (
+WITH source_drugs AS (
+    SELECT *
+    FROM ""Drugs""
+    ORDER BY ""Id""
+    LIMIT {demoLimit}
+),
+ranked AS (
     SELECT d.*,
            ROW_NUMBER() OVER (
                ORDER BY (
@@ -5533,7 +5576,7 @@ WITH ranked AS (
            ) AS rn,
            similarity(d.""name_unaccent"", unaccent({drugName})) AS sim,
            ts_rank(d.""name_tsv"", plainto_tsquery(unaccent({drugName}))) AS ts_rank
-    FROM ""Drugs"" d
+    FROM source_drugs d
     WHERE
         (
             d.""name_unaccent"" % unaccent({drugName}) OR
@@ -5564,7 +5607,7 @@ LIMIT {pageSize} OFFSET {offset};";
         }
 
         internal async Task<ICollection<Drug>> GetDrugsByPCNPaginated(
-    string insurance, string drugName, int pageSize, int pageNumber)
+            string insurance, string drugName, int pageSize, int pageNumber, bool isDemo = false)
         {
             // Normalize paging
             pageSize = Math.Max(pageSize, 1);
@@ -5596,13 +5639,20 @@ LIMIT {pageSize} OFFSET {offset};";
                         x.ScriptCode != null && x.ScriptCode != "");
             }
 
+            int demoLimit = isDemo ? DemoDrugLimit : int.MaxValue;
+
             FormattableString sql;
 
             if (useGlobal)
             {
-                // GLOBAL: only drugs that have at least one DrugInsurance with non-empty ScriptCode
                 sql = $@"
-WITH ranked AS (
+WITH source_drugs AS (
+    SELECT *
+    FROM ""Drugs""
+    ORDER BY ""Id""
+    LIMIT {demoLimit}
+),
+ranked AS (
     SELECT d.*,
            ROW_NUMBER() OVER (
                ORDER BY (
@@ -5614,7 +5664,7 @@ WITH ranked AS (
            ) AS rn,
            similarity(d.""name_unaccent"", unaccent({drugName})) AS sim,
            ts_rank(d.""name_tsv"", plainto_tsquery(unaccent({drugName}))) AS ts_rank
-    FROM ""Drugs"" d
+    FROM source_drugs d
     WHERE
         (
             d.""name_unaccent"" % unaccent({drugName}) OR
@@ -5637,9 +5687,14 @@ LIMIT {pageSize} OFFSET {offset};";
             }
             else
             {
-                // PCN-limited: require ScriptCode on the joined DI row
                 sql = $@"
-WITH ranked AS (
+WITH source_drugs AS (
+    SELECT *
+    FROM ""Drugs""
+    ORDER BY ""Id""
+    LIMIT {demoLimit}
+),
+ranked AS (
     SELECT d.*,
            ROW_NUMBER() OVER (
                ORDER BY (
@@ -5652,7 +5707,7 @@ WITH ranked AS (
            similarity(d.""name_unaccent"", unaccent({drugName})) AS sim,
            ts_rank(d.""name_tsv"", plainto_tsquery(unaccent({drugName}))) AS ts_rank
     FROM ""DrugInsurances"" di
-    INNER JOIN ""Drugs"" d ON di.""DrugId"" = d.""Id""
+    INNER JOIN source_drugs d ON di.""DrugId"" = d.""Id""
     INNER JOIN ""InsuranceRxes"" rx ON di.""InsuranceId"" = rx.""Id""
     INNER JOIN ""InsurancePCNs"" pcn ON rx.""InsurancePCNId"" = pcn.""Id""
     WHERE LOWER(pcn.""PCN"") = LOWER({insurance})
@@ -5676,11 +5731,17 @@ LIMIT {pageSize} OFFSET {offset};";
                 .AsNoTracking()
                 .ToListAsync();
 
-            // Safety net: if limited query returned zero (race/edge), fallback once to global (still requiring ScriptCode)
+            // Safety net: if limited query returned zero, fallback once to global
             if (!useGlobal && drugs.Count == 0)
             {
                 FormattableString fallbackSql = $@"
-WITH ranked AS (
+WITH source_drugs AS (
+    SELECT *
+    FROM ""Drugs""
+    ORDER BY ""Id""
+    LIMIT {demoLimit}
+),
+ranked AS (
     SELECT d.*,
            ROW_NUMBER() OVER (
                ORDER BY (
@@ -5692,7 +5753,7 @@ WITH ranked AS (
            ) AS rn,
            similarity(d.""name_unaccent"", unaccent({drugName})) AS sim,
            ts_rank(d.""name_tsv"", plainto_tsquery(unaccent({drugName}))) AS ts_rank
-    FROM ""Drugs"" d
+    FROM source_drugs d
     WHERE
         (
             d.""name_unaccent"" % unaccent({drugName}) OR
@@ -5721,8 +5782,10 @@ LIMIT {pageSize} OFFSET {offset};";
 
             return drugs;
         }
+
+
         internal async Task<ICollection<Drug>> GetDrugsByBINPaginated(
-          string insurance, string drugName, int pageSize, int pageNumber)
+          string insurance, string drugName, int pageSize, int pageNumber, bool isDemo = false)
         {
             // Normalize paging
             pageSize = Math.Max(pageSize, 1);

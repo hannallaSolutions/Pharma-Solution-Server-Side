@@ -64,6 +64,7 @@ namespace SearchTool_ServerSide.Authentication
             var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             var email = user.FindFirst(ClaimTypes.Email)?.Value;
             var branchId = user.FindFirst("BranchId")?.Value;
+            Console.WriteLine("UserId : " + userId + " - UserEmail : "+ email + " - Branch : "+ branchId + " - UserRole : "+ role); 
             return new TokenReadDto { UserId = userId, UserRole = role, Email = email, BranchId = branchId };
         }
         public TokenReadDto ValidateRefreshToken(string refreshToken)

@@ -23,9 +23,9 @@ namespace SearchTool_ServerSide.Services
         {
             await _drugRepository.ImportDrugInsuranceAsync();
         }
-        public async Task<ICollection<Drug>> SearchName(string name, int pageNumber, int pageSize)
+        public async Task<ICollection<Drug>> SearchName(string name, int pageNumber, int pageSize,bool isDemo=false)
         {
-            var items = await _drugRepository.GetDrugsByName(name, pageNumber, pageSize);
+            var items = await _drugRepository.GetDrugsByName(name, pageNumber, pageSize,isDemo);
             return items;
         }
         public async Task<int> ImportDrugInsuranceFileAsync(IFormFile uploadedFile, CancellationToken ct = default)
@@ -242,17 +242,17 @@ namespace SearchTool_ServerSide.Services
             return items;
         }
 
-        internal async Task<ICollection<Drug>> GetDrugsByInsuranceNamePaginated(string insurance, string drugName, int pageSize, int pageNumber)
+        internal async Task<ICollection<Drug>> GetDrugsByInsuranceNamePaginated(string insurance, string drugName, int pageSize, int pageNumber, bool isDemo = false)
         {
-            return await _drugRepository.GetDrugsByInsuranceNamePaginated(insurance, drugName, pageSize, pageNumber);
+            return await _drugRepository.GetDrugsByInsuranceNamePaginated(insurance, drugName, pageSize, pageNumber,isDemo);
         }
-        internal async Task<ICollection<Drug>> GetDrugsByPCNPaginated(string insurance, string drugName, int pageSize, int pageNumber)
+        internal async Task<ICollection<Drug>> GetDrugsByPCNPaginated(string insurance, string drugName, int pageSize, int pageNumber, bool isDemo = false)
         {
-            return await _drugRepository.GetDrugsByPCNPaginated(insurance, drugName, pageSize, pageNumber);
+            return await _drugRepository.GetDrugsByPCNPaginated(insurance, drugName, pageSize, pageNumber,isDemo);
         }
-        internal async Task<ICollection<Drug>> GetDrugsByBINPaginated(string insurance, string drugName, int pageSize, int pageNumber)
+        internal async Task<ICollection<Drug>> GetDrugsByBINPaginated(string insurance, string drugName, int pageSize, int pageNumber, bool isDemo = false)
         {
-            return await _drugRepository.GetDrugsByBINPaginated(insurance, drugName, pageSize, pageNumber);
+            return await _drugRepository.GetDrugsByBINPaginated(insurance, drugName, pageSize, pageNumber, isDemo);
         }
 
         internal async Task<ICollection<DrugModal>> GetDrugClassesByInsuranceNamePagintated(string insurance, string drugClassName, int pageSize, int pageNumber, string ClassVersion = "ClassV1")
@@ -300,10 +300,10 @@ namespace SearchTool_ServerSide.Services
         string? pcn = null,
         string? bin = null,
         string? diseaseName = null,
-        int branchId = 1)
+        int branchId = 1, bool isDemo = false)
         {
             return await _drugRepository.GetAlternativesWithInsurance(classInfoId, 
-            sourceDrugNDC, sourceRxGroupId, matchedRx, pageNumber, pageSize, rxgroup, pcn, bin, diseaseName, branchId);
+            sourceDrugNDC, sourceRxGroupId, matchedRx, pageNumber, pageSize, rxgroup, pcn, bin, diseaseName, branchId,isDemo);
         }
         internal async Task<AlternativesFilterOptionsDto> GetAlternativesWithInsuranceFilters(int classInfoId, string sourceDrugNDC, string? rxgroup = null, string? pcn = null, string? bin = null)
         {
@@ -314,9 +314,9 @@ namespace SearchTool_ServerSide.Services
             int rxgroupId,
             string sourceDrugNDC,
             int pageNumber = 1,
-            int pageSize = 10, int branchId = 0)
+            int pageSize = 10, int branchId = 0,bool isDemo = false)
         {
-            return await _drugRepository.GetAlternativesNoInsurancePaged(classInfoId, rxgroupId, sourceDrugNDC, pageNumber, pageSize, branchId);
+            return await _drugRepository.GetAlternativesNoInsurancePaged(classInfoId, rxgroupId, sourceDrugNDC, pageNumber, pageSize, branchId,isDemo);
         }
         internal async Task<(ICollection<string> InsuranceNDC, ICollection<string> AllInsuranceNDC)> GetDrugInsuranceNDCS(string drugName, int? insuranceId)
         {

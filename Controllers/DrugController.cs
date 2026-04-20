@@ -60,8 +60,10 @@ namespace SearchTool_ServerSide.Controllers
         [HttpGet("searchByName")]
         public async Task<IActionResult> SearchByname([FromQuery] string name, [FromQuery] int pageNumber, [FromQuery] int pageSize)
         {
+            var tokenData = userAccessToken.tokenData();
+            bool isDemo = tokenData.UserRole == "Demo" ? true : false;
             // Console.WriteLine("Name: " + name+" PageNumber: " + pageNumber + " PageSize: " + pageSize);
-            var items = await _drugService.SearchName(name, pageNumber, pageSize);
+            var items = await _drugService.SearchName(name, pageNumber, pageSize,isDemo);
             return Ok(items);
         }
         [HttpGet("GetClassesByName")]
@@ -203,19 +205,25 @@ namespace SearchTool_ServerSide.Controllers
         [HttpGet("GetDrugsByInsuranceNamePagintated")]
         public async Task<IActionResult> GetDrugsByInsuranceNamePagintated([FromQuery] string insurance, [FromQuery] string drugName, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20)
         {
-            var items = await _drugService.GetDrugsByInsuranceNamePaginated(insurance, drugName, pageSize, pageNumber);
+            var tokenData = userAccessToken.tokenData();
+            bool isDemo = tokenData.UserRole == "Demo" ? true : false;
+            var items = await _drugService.GetDrugsByInsuranceNamePaginated(insurance, drugName, pageSize, pageNumber, isDemo);
             return Ok(items);
         }
         [HttpGet("GetDrugsByPCNPagintated")]
         public async Task<IActionResult> GetDrugsByPCNPagintated([FromQuery] string insurance, [FromQuery] string drugName, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20)
         {
-            var items = await _drugService.GetDrugsByPCNPaginated(insurance, drugName, pageSize, pageNumber);
+            var tokenData = userAccessToken.tokenData();
+            bool isDemo = tokenData.UserRole == "Demo" ? true : false;
+            var items = await _drugService.GetDrugsByPCNPaginated(insurance, drugName, pageSize, pageNumber, isDemo);
             return Ok(items);
         }
         [HttpGet("GetDrugsByBINPagintated")]
         public async Task<IActionResult> GetDrugsByBINPagintated([FromQuery] string insurance, [FromQuery] string drugName, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20)
         {
-            var items = await _drugService.GetDrugsByBINPaginated(insurance, drugName, pageSize, pageNumber);
+            var tokenData = userAccessToken.tokenData();
+            bool isDemo = tokenData.UserRole == "Demo" ? true : false;
+            var items = await _drugService.GetDrugsByBINPaginated(insurance, drugName, pageSize, pageNumber, isDemo);
             return Ok(items);
         }
         [HttpGet("GetDrugsByInsuranceNameDrugName")]
@@ -352,9 +360,11 @@ namespace SearchTool_ServerSide.Controllers
             )
         {
             var tokenData = userAccessToken.tokenData();
+            bool isDemo = tokenData.UserRole == "Demo" ? true : false;
+
             var items = await _drugService.GetAlternativesWithInsurance(
                 classInfoId, sourceDrugNDC, sourceRxGroupId, matchedRx, pageNumber,
-                 pageSize, rxgroup, pcn, bin, diseaseName,int.Parse(tokenData.BranchId));
+                 pageSize, rxgroup, pcn, bin, diseaseName,int.Parse(tokenData.BranchId), isDemo);
             return Ok(items);
         }
         [HttpGet("GetAlternativesWithInsuranceFilters"), AllowAnonymous]
@@ -379,8 +389,8 @@ namespace SearchTool_ServerSide.Controllers
             [FromQuery] int pageSize = 10)
         {
             var tokenData = userAccessToken.tokenData();
-
-            var result = await _drugService.GetAlternativesNoInsurancePaged(classInfoId, rxgroupId, sourceDrugNDC, pageNumber, pageSize, int.Parse(tokenData.BranchId));
+            bool isDemo = tokenData.UserRole == "Demo" ? true : false;
+            var result = await _drugService.GetAlternativesNoInsurancePaged(classInfoId, rxgroupId, sourceDrugNDC, pageNumber, pageSize, int.Parse(tokenData.BranchId), isDemo);
             return Ok(result);
         }
         [HttpGet("GetDrugInsuranceNDCS")]
