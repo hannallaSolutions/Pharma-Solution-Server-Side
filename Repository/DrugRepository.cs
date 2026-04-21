@@ -4823,9 +4823,10 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
             // Try to get the specific classVersion from the cache
             if (!_cache.TryGetValue(cacheKey, out allData) && branchId!=0)
             {
+                Console.WriteLine("Hii the cachKey : " + cacheKey);
+
                 // Cache miss: Load the entire dataset for this classVersion
                 allData = await GetAuditDtosWithBestBeforeOrPrevMonthAsync(classVersion, matchOn,mainCompanyId,branchId);
-
                 // Set up cache options (e.g., 120 minutes sliding expiration)
                 var cacheOptions = new MemoryCacheEntryOptions()
                     .SetSlidingExpiration(TimeSpan.FromMinutes(120));
@@ -4858,7 +4859,7 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
                     .ThenInclude(irx => irx.InsurancePCN)
                         .ThenInclude(pcn => pcn.Insurance)
                 .Include(si => si.Prescriber)
-                .Where(si => si.Script.Branch.MainCompanyId == mainCompanyId  && si.Drug.DrugClasses.Any(dc => dc.ClassInfo.ClassType.Name == classTypeName))
+                .Where(si => si.Script.BranchId == branchId  && si.Drug.DrugClasses.Any(dc => dc.ClassInfo.ClassType.Name == classTypeName))
                 .ToListAsync();
 
             if (!scriptItems.Any()) return new();
