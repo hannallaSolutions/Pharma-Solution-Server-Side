@@ -153,7 +153,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-//.UseCors("CorsPolicy");
+//app.UseCors("CorsPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<UserLogsMiddleware>();
