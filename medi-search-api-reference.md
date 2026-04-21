@@ -22,6 +22,7 @@ All routes are prefixed by their respective controllers. Authorization requireme
 ---
 
 ## 💊 `DrugController` (Route: `/drug`)
+#any comment to test deploy
 
 🔐 **Authorization**: `Pharmacist` (some anonymous)
 
