@@ -35,4 +35,13 @@ public class BranchDto
     public string MainCompanyName { get; set; }
 }
 
+public class EditBranchDto
+{
+    public string Name { get; set; }
+    public string Location { get; set; }
+    public string Code { get; set; }
+
+    public int MainCompanyId { get; set; } //  to allow changing the main company association if needed
+}
+
 }

@@ -28,7 +28,27 @@ namespace SearchTool_ServerSide.Controllers
             var user = await _userService.Register(userAddDto);
             return Ok(user);
         }
+[HttpPost("RegisterDemo")]
+[AllowAnonymous]
+public async Task<IActionResult> RegisterDemo([FromBody] DemoRegisterDto dto)
+{
+    var oldUser = await _userService.GetUserByEmail(dto.Email);
 
+    if (oldUser != null)
+    {
+        return Conflict(new { message = "This email already exists." });
+    }
+
+    dto.Password = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+
+    var user = await _userService.RegisterDemo(dto);
+
+    return Ok(new
+    {
+        message = "Demo user registered successfully",
+        user
+    });
+}
 
         [HttpPost("login"),AllowAnonymous]
         public async Task<IActionResult> Login(UserLoginDto userLoginDto)
@@ -191,16 +211,13 @@ namespace SearchTool_ServerSide.Controllers
             }
             return Ok("Password reset successfully");
         }
+       
         [HttpPut("EditUser"), Authorize]
-      //      [HasPermission("GetAllUsers + ResetUserPassword") ]
-        public async Task<IActionResult> EditUser([FromQuery]int userId, [FromBody]UserReadDto userReadDto)
-        {
-            var updatedUser = await _userService.EditUser(userId, userReadDto);
-            if (updatedUser == null)
-            {
-                return NotFound("User not found");
-            }
-            return Ok(updatedUser);
-        }
+public async Task<IActionResult> EditUser([FromQuery] int userId, [FromBody] EditUserDto dto)
+{
+    var updatedUser = await _userService.EditUser(userId, dto);
+    if (updatedUser == null) return NotFound("User not found");
+    return Ok(updatedUser);
+}
     }
 }

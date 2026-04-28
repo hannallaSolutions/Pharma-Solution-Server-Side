@@ -94,7 +94,7 @@ builder.Services.AddScoped<EmailCampaignService>();
 builder.Services.AddScoped<RecipientFileParserService>();
 builder.Services.AddScoped<EmailSenderService>();
 //////////////////////////////////////////////
-
+builder.Services.AddScoped<LocalEmailValidationService>();
 //////////////////////////////////////////////
 builder.Services.Configure<GeminiOptions>(builder.Configuration.GetSection("Gemini"));
 builder.Services.AddHttpClient<IGeminiChatService, GeminiChatService>(client =>

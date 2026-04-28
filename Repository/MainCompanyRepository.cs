@@ -63,5 +63,22 @@ namespace SearchTool_ServerSide.Repository
             return await _context.MainCompanies
                 .FirstOrDefaultAsync(x => x.Id == id);
         }
+
+        //edit each row
+        internal async Task<bool> EditMainCompanyAsync(int id, MainCompany updatedCompany)
+        {
+            var existingCompany = await _context.MainCompanies.FindAsync(id);
+            if (existingCompany == null)
+            {
+                return false;
+            }
+
+            existingCompany.Name = updatedCompany.Name;
+            existingCompany.SpecialtyId = updatedCompany.SpecialtyId;
+
+            await _context.SaveChangesAsync();
+            return true;
+        }
+        
     }
 }

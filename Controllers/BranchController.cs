@@ -71,5 +71,15 @@ namespace SearchTool_ServerSide.Controllers
 
             return Ok(data);
         }
+
+        //edit row
+        [HttpPut("edit")]
+
+        public async Task<IActionResult> EditBranch([FromQuery] int branchId, [FromBody] EditBranchDto branch)
+        {
+            var result = await _branchService.EditBranch(branchId, branch);
+            return result ? NoContent() : NotFound();
     }
+    
+}
 }

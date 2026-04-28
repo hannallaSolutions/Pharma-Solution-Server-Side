@@ -32,5 +32,8 @@ namespace SearchTool_ServerSide.Services
             return await _mainCompanyService.AddMainCompanyAsync(mainCompany);
 
         }
+
+        //edit main company
+            
     }
 }
