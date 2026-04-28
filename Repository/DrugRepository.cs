@@ -1,13 +1,3 @@
-using System;
-using System.Diagnostics;
-using System.Drawing;
-using System.Formats.Asn1;
-using System.Globalization;
-using System.Linq;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Transactions;
 using AutoMapper;
 using CsvHelper;
 using CsvHelper.Configuration;
@@ -20,12 +10,23 @@ using Microsoft.Extensions.Caching.Memory;
 using OfficeOpenXml;
 using SearchTool_ServerSide.Data;
 using SearchTool_ServerSide.Dtos;
+using SearchTool_ServerSide.Dtos.BranchDTOs;
 using SearchTool_ServerSide.Dtos.ClassDtos;
 using SearchTool_ServerSide.Dtos.DrugDtos;
 using SearchTool_ServerSide.Dtos.InsuranceDtos.cs;
 using SearchTool_ServerSide.Dtos.ScritpsDto;
 using SearchTool_ServerSide.Models;
 using ServerSide.Models;
+using System;
+using System.Diagnostics;
+using System.Drawing;
+using System.Formats.Asn1;
+using System.Globalization;
+using System.Linq;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Transactions;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace SearchTool_ServerSide.Repository
@@ -4093,9 +4094,10 @@ public async Task<PagedResult<DrugsAlternativesReadDto>> GetAlternativesWithInsu
             select new BaseRow { Dc = dc, D = d, Ci = ci };
     }
 
-    // pre-filter DrugInsurances in SQL to only rows that have ScriptCode
-    var diWithScript = _context.DrugInsurances.AsNoTracking()
-        .Where(di => di.ScriptCode != null && di.ScriptCode != "");
+            // pre-filter DrugInsurances in SQL to only rows that have ScriptCode
+            var branch = await _context.Branches.FirstOrDefaultAsync(x => x.Id == branchId);
+    var diWithScript = _context.DrugInsurances.Include(x=>x.Branch).AsNoTracking()
+        .Where(di => di.ScriptCode != null && di.ScriptCode != "" && di.Branch.MainCompanyId == branch.MainCompanyId);
 
     var query =
         from br in baseSet
@@ -4531,7 +4533,7 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
             }
 
             IQueryable<BaseRow> baseSet;
-
+            var branch = await  _context.Branches.FirstOrDefaultAsync(x => x.Id == branchId);
             if (classInfo.ClassTypeId >= 7)
             {
                 var sourceClassIds = await (
@@ -4557,7 +4559,8 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
                     from dc in _context.DrugClasses
                     join d in _context.Drugs on dc.DrugId equals d.Id
                     join ci in _context.ClassInfos on dc.ClassId equals ci.Id
-                    join di in _context.DrugInsurances on dc.DrugId equals di.DrugId into diGroup
+                    join di in _context.DrugInsurances
+                            .Where(x => x.Branch.MainCompanyId == branch.MainCompanyId) on dc.DrugId equals di.DrugId into diGroup
                     from di in diGroup.DefaultIfEmpty()
                     where sourceClassIds.Contains(dc.ClassId)
                           && ci.ClassTypeId == classInfo.ClassTypeId
@@ -4568,15 +4571,22 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
             else
             {
                 baseSet =
-                    from dc in _context.DrugClasses
-                    join d in _context.Drugs on dc.DrugId equals d.Id
-                    join ci in _context.ClassInfos on dc.ClassId equals ci.Id
-                    join di in _context.DrugInsurances on dc.DrugId equals di.DrugId into diGroup
-                    from di in diGroup.DefaultIfEmpty()
-                    where dc.ClassId == classInfoId
-                          && d.NDC != sourceDrugNDC
-                          && di == null                 // ✅ only drugs with no insurance
-                    select new BaseRow { Dc = dc, D = d, Ci = ci };
+                        from dc in _context.DrugClasses
+                        join d in _context.Drugs on dc.DrugId equals d.Id
+                        join ci in _context.ClassInfos on dc.ClassId equals ci.Id
+                        join di in _context.DrugInsurances
+                            .Where(x => x.Branch.MainCompanyId == branch.MainCompanyId)
+                            on dc.DrugId equals di.DrugId into diGroup
+                        from di in diGroup.DefaultIfEmpty()
+                        where dc.ClassId == classInfoId
+                              && d.NDC != sourceDrugNDC
+                              && di == null
+                        select new BaseRow
+                        {
+                            Dc = dc,
+                            D = d,
+                            Ci = ci
+                        };
             }
 
             // Optional branch info (default branch = 1)

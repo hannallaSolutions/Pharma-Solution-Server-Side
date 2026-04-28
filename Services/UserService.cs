@@ -52,6 +52,8 @@ namespace SearchTool_ServerSide.Services
                 Date = DateTime.UtcNow,
                 Action = "Login",
                 Description = $"User logged in successfully",
+                IpAddress = "Unknown",
+                DeviceInfo = "Unknown"
 
             };
             await _logRepository.Add(log);
