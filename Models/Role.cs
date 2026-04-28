@@ -7,5 +7,7 @@ namespace SearchTool_ServerSide.Models
         SuperAdmin,
         Doctor,
         Demo,
+
+
     }
 }
