@@ -69,12 +69,14 @@ namespace SearchTool_ServerSide.Repository
             return await _context.Users
                 .FirstOrDefaultAsync(x => x.Email.ToLower() == email.ToLower());
         }
+
         internal async Task<ICollection<UserReadDto>> GetAllUsers()
         {
             return await _context.Users.Include(x => x.Branch)
                 .Select(user => _mapper.Map<UserReadDto>(user))
                 .ToListAsync();
         }
+
         internal async Task<bool> ResetUserPassword(string userEmail)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == userEmail.ToLower());
@@ -88,21 +90,19 @@ namespace SearchTool_ServerSide.Repository
             await _context.SaveChangesAsync();
             return true;
         }
-        internal async Task<User?> EditUser(int userId, UserReadDto userReadDto)
-        {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
-            if (user == null)
-            {
-                return null;
-            }
-            user.Email = userReadDto.Email;
-            user.Name = userReadDto.Name;
-            user.BranchId = userReadDto.BranchId;
-            user.Role = userReadDto.Role;
+      
+internal async Task<User?> EditUser(int userId, EditUserDto dto)
+{
+    var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+    if (user == null) return null;
 
-            await _context.SaveChangesAsync();
-            return user;
-        }
+    user.Email = dto.Email;
+    user.Name = dto.Name;
+    user.BranchId = dto.BranchId;
+    user.Role = dto.Role;
 
+    await _context.SaveChangesAsync();
+    return user;
+}
     }
 }

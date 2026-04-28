@@ -15,6 +15,8 @@ namespace SearchTool_ServerSide.Profiles
             CreateMap<User, UserLoginDto>().ReverseMap();
             CreateMap<User, UserUpdateDto>().ReverseMap().ForAllMembers(opt => opt.Condition((src, dest, srcMember) => srcMember != null));
             CreateMap<User, AllUserAddDto>().ReverseMap();
+            CreateMap<User, UserReadDto>()
+    .ForMember(dest => dest.BranchName, opt => opt.MapFrom(src => src.Branch.Name));
         }
     }
 }

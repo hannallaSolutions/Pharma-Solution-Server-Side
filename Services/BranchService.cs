@@ -28,7 +28,23 @@ namespace SearchTool_ServerSide.Services
             return  await _branchRepository.CreateAsync(branch);
         }
 
-        //delete branch by id
+    
+
+        //edit branch
+        public async Task<bool> EditBranch(int branchId, EditBranchDto branch)
+        {
+            var existingBranch = await _branchRepository.GetBranchById(branchId);
+            if (existingBranch == null)
+            {
+                return false;
+            }
+
+            _mapper.Map(branch, existingBranch);
+            await _branchRepository.UpdateAsync(existingBranch);
+            return true;
+        }
+
+       //delete branch by id
         public async Task<bool> DeleteBranchById(int branchId)
         {
             var branch = await _branchRepository.GetBranchById(branchId);
@@ -40,5 +56,6 @@ namespace SearchTool_ServerSide.Services
             await _branchRepository.DeleteAsync(branch);
             return true;
         }
+
     }
 }

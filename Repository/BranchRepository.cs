@@ -81,6 +81,41 @@ namespace SearchTool_ServerSide.Repository
         {
             throw new NotImplementedException();
         }
+
+        //update branch
+        internal async Task UpdateAsync(Branch branch)
+        {
+            _context.Branches.Update(branch);
+            await _context.SaveChangesAsync();
+        }
+
+ 
+        internal async Task<bool> EditBranch(int branchId, EditBranchDto dto)
+        {
+            var branch = await _context.Branches.FindAsync(branchId);
+            if (branch == null) return false;
+
+            branch.Name = dto.Name;
+            branch.Location = dto.Location;
+            branch.Code = dto.Code;
+
+            // if you want to allow changing the main company association, update it as well
+            branch.MainCompanyId = dto.MainCompanyId;
+
+            await _context.SaveChangesAsync();
+            return true;
     }
 
+// delete branch by id
+        internal async Task<bool> DeleteBranchById(int branchId)
+        {
+            var branch = await _context.Branches.FindAsync(branchId);
+            if (branch == null) return false;
+
+            _context.Branches.Remove(branch);
+            await _context.SaveChangesAsync();
+            return true;
+    }
+
+    }
 }
