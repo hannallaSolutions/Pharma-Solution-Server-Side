@@ -8,7 +8,7 @@ using SearchTool_ServerSide.Authorization;
 namespace SearchTool_ServerSide.Controllers
 {
     [ApiController]
-    [Route("scripts")]
+    [Route("scripts"),Authorize(Policy ="Admin")]
     public class ScriptsController(ScriptsService service, UserAccessToken userAccessToken) : ControllerBase
     {
 

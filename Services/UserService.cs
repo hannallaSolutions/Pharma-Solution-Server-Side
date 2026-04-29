@@ -20,22 +20,22 @@ namespace SearchTool_ServerSide.Services
             var userReadDto = _mapper.Map<UserReadDto>(user);
             return userReadDto;
         }
-internal async Task<UserReadDto> RegisterDemo(DemoRegisterDto dto)
-{
-    var user = new User
-    {
-        Email = dto.Email,
-        Name = dto.Email,
-        ShortName = dto.Email,
-        Password = dto.Password,
-        Role = Role.Demo,
-        BranchId = 1
-    };
+        internal async Task<UserReadDto> RegisterDemo(DemoRegisterDto dto)
+        {
+            var user = new User
+            {
+                Email = dto.Email,
+                Name = dto.Email,
+                ShortName = dto.Email,
+                Password = dto.Password,
+                Role = Role.Demo,
+                BranchId = 1
+            };
 
-    user = await _userRepository.Add(user);
+            user = await _userRepository.Add(user);
 
-    return _mapper.Map<UserReadDto>(user);
-}
+            return _mapper.Map<UserReadDto>(user);
+        }
         internal async Task<UserReadDto> GetUserByEmail(string email)
         {
             var user = await _userRepository.GetUserByEmail(email);

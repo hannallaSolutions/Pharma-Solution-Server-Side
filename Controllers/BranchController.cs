@@ -1,9 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SearchTool_ServerSide.Authentication;
+using SearchTool_ServerSide.Data;
 using SearchTool_ServerSide.Dtos.BranchDTOs;
 using SearchTool_ServerSide.Services;
-using SearchTool_ServerSide.Data;
 
 namespace SearchTool_ServerSide.Controllers
 {
@@ -12,11 +13,13 @@ namespace SearchTool_ServerSide.Controllers
     public class BranchController : ControllerBase
     {
         private readonly BranchService _branchService;
+        private readonly UserAccessToken _userAccessToken;
         private readonly SearchToolDBContext _context;
 
-        public BranchController(BranchService branchService, SearchToolDBContext context)
+        public BranchController(BranchService branchService, UserAccessToken userAccessToken, SearchToolDBContext context)
         {
             _branchService = branchService;
+            _userAccessToken = userAccessToken;
             _context = context;
         }
 
@@ -41,7 +44,17 @@ namespace SearchTool_ServerSide.Controllers
             var branches = await _branchService.GetAllBranches();
             return Ok(branches);
         }
-
+        [HttpGet("GetAllMainComapnyBranchesByBranchId")]
+        public async Task<IActionResult> GetAllMainComapnyBranchesByBranchId()
+        {
+            var tokenData = _userAccessToken.tokenData();
+            if(tokenData==null || tokenData.BranchId == null)
+            {
+                return NotFound("Invalid Data");
+            }
+            var branches = await _branchService.GetAllMainComapnyBranchesByBranchId(int.Parse(tokenData.BranchId));
+            return Ok(branches);
+        }
         [HttpPost("CreateBranch")]
         public async Task<IActionResult> CreateBranch([FromBody] CreateBranchDto branch)
         {

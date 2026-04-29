@@ -28,27 +28,27 @@ namespace SearchTool_ServerSide.Controllers
             var user = await _userService.Register(userAddDto);
             return Ok(user);
         }
-[HttpPost("RegisterDemo")]
-[AllowAnonymous]
-public async Task<IActionResult> RegisterDemo([FromBody] DemoRegisterDto dto)
-{
-    var oldUser = await _userService.GetUserByEmail(dto.Email);
+        [HttpPost("RegisterDemo")]
+        [AllowAnonymous]
+        public async Task<IActionResult> RegisterDemo([FromBody] DemoRegisterDto dto)
+        {
+            var oldUser = await _userService.GetUserByEmail(dto.Email);
 
-    if (oldUser != null)
-    {
-        return Conflict(new { message = "This email already exists." });
-    }
+            if (oldUser != null)
+            {
+                return Conflict(new { message = "This email already exists." });
+            }
 
-    dto.Password = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+            dto.Password = BCrypt.Net.BCrypt.HashPassword(dto.Password);
 
-    var user = await _userService.RegisterDemo(dto);
+            var user = await _userService.RegisterDemo(dto);
 
-    return Ok(new
-    {
-        message = "Demo user registered successfully",
-        user
-    });
-}
+            return Ok(new
+            {
+                message = "Demo user registered successfully",
+                user
+            });
+        }
 
         [HttpPost("login"),AllowAnonymous]
         public async Task<IActionResult> Login(UserLoginDto userLoginDto)

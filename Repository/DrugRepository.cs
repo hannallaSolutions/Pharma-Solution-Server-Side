@@ -2014,9 +2014,9 @@ namespace SearchTool_ServerSide.Repository
             // ========================================================
             // Preload Users, Branches, and Scripts.
             var userDict = await _context.Users
-                .GroupBy(u => u.ShortName)
+                .GroupBy(u => u.Email)
                 .Select(g => g.First())
-                .ToDictionaryAsync(u => u.ShortName);
+                .ToDictionaryAsync(u => u.Email);
             var scriptDict = await _context.Scripts.ToDictionaryAsync(s => s.ScriptCode);
 
             var newUsers = new List<User>();
@@ -2523,9 +2523,9 @@ namespace SearchTool_ServerSide.Repository
             // ========================================================
             // Preload Users, Branches, and Scripts.
             var userDict = await _context.Users
-                .GroupBy(u => u.ShortName)
+                .GroupBy(u => u.Email)
                 .Select(g => g.First())
-                .ToDictionaryAsync(u => u.ShortName);
+                .ToDictionaryAsync(u => u.Email);
             var scriptDict = await _context.Scripts.ToDictionaryAsync(s => s.ScriptCode);
 
             var newUsers = new List<User>();
@@ -2679,8 +2679,14 @@ namespace SearchTool_ServerSide.Repository
             };
 
             List<ScriptRecord> records;
+
             using (var stream = uploadedFile.OpenReadStream())
-            using (var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: 1024, leaveOpen: false))
+            using (var reader = new StreamReader(
+                stream,
+                Encoding.UTF8,
+                detectEncodingFromByteOrderMarks: true,
+                bufferSize: 1024,
+                leaveOpen: false))
             using (var csv = new CsvReader(reader, csvConfig))
             {
                 records = csv.GetRecords<ScriptRecord>().ToList();
@@ -2690,7 +2696,7 @@ namespace SearchTool_ServerSide.Repository
             var ci = StringComparer.OrdinalIgnoreCase;
 
             // ========================================================
-            // LOAD ALL DATA UPFRONT (Single queries instead of multiple)
+            // LOAD ALL DATA UPFRONT
             // ========================================================
             var insuranceDict = (await _context.Insurances.AsNoTracking().ToListAsync(ct))
                 .GroupBy(i => (i.Bin ?? "").Trim(), ci)
@@ -2705,35 +2711,77 @@ namespace SearchTool_ServerSide.Repository
                 .ToDictionary(g => g.Key, g => g.First(), ci);
 
             var drugsFromDb = await _context.Drugs.AsNoTracking().ToListAsync(ct);
-            var drugDict = drugsFromDb.GroupBy(d => d.NDC).ToDictionary(g => g.Key, g => g.First());
-            var drugByNameDict = drugsFromDb.GroupBy(d => d.Name).ToDictionary(g => g.Key, g => g.First());
 
-            var existingDrugClasses = await _context.DrugClasses.AsNoTracking().ToListAsync(ct);
-            var drugClassKeySet = new HashSet<(int ClassId, int DrugId)>(
-                existingDrugClasses.Select(dc => (dc.ClassId, dc.DrugId)));
-
-            var branchDict = await _context.Branches.AsNoTracking().ToDictionaryAsync(b => b.Code, ct);
-            var userDict = (await _context.Users.AsNoTracking().ToListAsync(ct))
-                .GroupBy(u => u.ShortName)
+            var drugDict = drugsFromDb
+                .Where(d => !string.IsNullOrWhiteSpace(d.NDC))
+                .GroupBy(d => d.NDC)
                 .ToDictionary(g => g.Key, g => g.First());
 
-            var scriptDict = await _context.Scripts.AsNoTracking().ToDictionaryAsync(s => s.ScriptCode, ct);
-            var drugBranchDict = await _context.DrugBranches.AsNoTracking().ToDictionaryAsync(g => (g.BranchId, g.DrugNDC), ct);
+            var drugByNameDict = drugsFromDb
+                .Where(d => !string.IsNullOrWhiteSpace(d.Name))
+                .GroupBy(d => d.Name)
+                .ToDictionary(g => g.Key, g => g.First());
 
-            // Load existing records with composite keys
-            var existingDrugInsurances = await _context.DrugInsurances.AsNoTracking().ToListAsync(ct);
-            var diDict = existingDrugInsurances.ToDictionary(di => (di.InsuranceId, di.DrugId, di.BranchId));
+            var existingDrugClasses = await _context.DrugClasses.AsNoTracking().ToListAsync(ct);
 
-            var existingClassInsurances = await _context.ClassInsurances.AsNoTracking().ToListAsync(ct);
-            var ciDict = existingClassInsurances.ToDictionary(
-                ci => (ci.InsuranceId, ci.ClassInfoId, ci.Date.Year, ci.Date.Month, ci.BranchId));
+            var drugClassKeySet = new HashSet<(int ClassId, int DrugId)>(
+                existingDrugClasses.Select(dc => (dc.ClassId, dc.DrugId))
+            );
+
+            var branchDict = await _context.Branches
+                .AsNoTracking()
+                .ToDictionaryAsync(b => b.Code, ct);
+
+            var userDict = (await _context.Users.AsNoTracking().ToListAsync(ct))
+                .Where(u => !string.IsNullOrWhiteSpace(u.Email))
+                .GroupBy(u => u.Email)
+                .ToDictionary(g => g.Key, g => g.First());
+
+            // IMPORTANT:
+            // ScriptCode alone is not unique.
+            // Same ScriptCode can exist in different branches.
+            var scriptDict = (await _context.Scripts
+                .AsNoTracking()
+                .ToListAsync(ct))
+                .GroupBy(s => (s.ScriptCode, s.BranchId))
+                .ToDictionary(g => g.Key, g => g.First());
+
+            var drugBranchDict = await _context.DrugBranches
+                .AsNoTracking()
+                .ToDictionaryAsync(g => (g.BranchId, g.DrugNDC), ct);
+
+            // ========================================================
+            // IMPORTANT FIX:
+            // These two are updated later, so DO NOT use AsNoTracking().
+            // EF must track them automatically.
+            // ========================================================
+            var existingDrugInsurances = await _context.DrugInsurances.ToListAsync(ct);
+
+            var diDict = existingDrugInsurances
+                .GroupBy(di => (di.InsuranceId, di.DrugId, di.BranchId))
+                .ToDictionary(g => g.Key, g => g.First());
+
+            var existingClassInsurances = await _context.ClassInsurances.ToListAsync(ct);
+
+            var ciDict = existingClassInsurances
+                .GroupBy(x => (x.InsuranceId, x.ClassInfoId, x.Date.Year, x.Date.Month, x.BranchId))
+                .ToDictionary(g => g.Key, g => g.First());
+
+            // ScriptItem uniqueness:
+            // Same script can contain multiple items.
+            // Use ScriptId + DrugId + RxNumber + ScriptDate.
             var scriptItemDic = (await _context.ScriptItems
                 .AsNoTracking()
-                .Select(s => new { s.ScriptId, s.DrugId, Date = s.Script.Date })
+                .Select(s => new
+                {
+                    s.ScriptId,
+                    s.DrugId,
+                    s.RxNumber,
+                    ScriptDate = s.Script.Date
+                })
                 .ToListAsync(ct))
-                .GroupBy(s => (s.ScriptId, s.DrugId, s.Date))
-                .ToDictionary(g => g.Key, g => true); // pick first or just existence
-
+                .GroupBy(s => (s.ScriptId, s.DrugId, s.RxNumber, s.ScriptDate))
+                .ToDictionary(g => g.Key, g => true);
 
             // Build drug class map upfront
             var drugClassMap = existingDrugClasses
@@ -2749,7 +2797,6 @@ namespace SearchTool_ServerSide.Repository
             var newDrugs = new List<Drug>();
             var stagedDrugClassLinks = new List<(string ndc, List<int> classInfoIds)>();
 
-            // Pre-process all records
             foreach (var record in records)
             {
                 record.Bin = (record.Bin ?? "").Trim().ToUpperInvariant();
@@ -2759,9 +2806,14 @@ namespace SearchTool_ServerSide.Repository
                 record.Branch = (record.Branch ?? "").Trim();
                 record.NDCCode = NormalizeNdcTo11Digits(record.NDCCode);
 
-                if (record.Bin.Length < 6) record.Bin = record.Bin.PadLeft(6, '0');
-                if (string.IsNullOrWhiteSpace(record.PCN)) record.PCN = record.Bin + "(OTHER)";
-                if (string.IsNullOrWhiteSpace(record.RxGroup)) record.RxGroup = record.PCN + "(OTHER)";
+                if (record.Bin.Length < 6)
+                    record.Bin = record.Bin.PadLeft(6, '0');
+
+                if (string.IsNullOrWhiteSpace(record.PCN))
+                    record.PCN = record.Bin + "(OTHER)";
+
+                if (string.IsNullOrWhiteSpace(record.RxGroup))
+                    record.RxGroup = record.PCN + "(OTHER)";
 
                 if (string.IsNullOrWhiteSpace(record.NDCCode) || record.NDCCode == "00000000000")
                     continue;
@@ -2769,7 +2821,11 @@ namespace SearchTool_ServerSide.Repository
                 // Insurance by BIN
                 if (!insuranceDict.ContainsKey(record.Bin))
                 {
-                    var ins = new Insurance { Bin = record.Bin };
+                    var ins = new Insurance
+                    {
+                        Bin = record.Bin
+                    };
+
                     newInsurances.Add(ins);
                     insuranceDict[record.Bin] = ins;
                 }
@@ -2794,13 +2850,16 @@ namespace SearchTool_ServerSide.Repository
                             ApplicationNumber = template.ApplicationNumber,
                             ApplicationType = template.ApplicationType
                         };
+
                         newDrugs.Add(drug);
                         drugDict[record.NDCCode] = drug;
 
-                        // Get class info IDs from template (cached)
                         if (drugClassMap.TryGetValue(template.Id, out var templateClasses))
                         {
-                            stagedDrugClassLinks.Add((drug.NDC, templateClasses.Select(dc => dc.ClassId).ToList()));
+                            stagedDrugClassLinks.Add((
+                                drug.NDC,
+                                templateClasses.Select(dc => dc.ClassId).ToList()
+                            ));
                         }
                     }
                     else
@@ -2813,16 +2872,19 @@ namespace SearchTool_ServerSide.Repository
             }
 
             // ========================================================
-            // BULK INSERT PHASE 1 - Single batch per entity type
+            // BULK INSERT PHASE 1
             // ========================================================
             if (newInsurances.Any())
             {
                 _context.Insurances.AddRange(newInsurances);
                 await _context.SaveChangesAsync(ct);
 
-                // Reload to get IDs
                 var bins = newInsurances.Select(i => i.Bin).ToList();
-                var freshInsurances = await _context.Insurances.Where(i => bins.Contains(i.Bin)).ToListAsync(ct);
+
+                var freshInsurances = await _context.Insurances
+                    .Where(i => bins.Contains(i.Bin))
+                    .ToListAsync(ct);
+
                 foreach (var ins in freshInsurances)
                     insuranceDict[ins.Bin] = ins;
             }
@@ -2832,32 +2894,46 @@ namespace SearchTool_ServerSide.Repository
                 _context.Drugs.AddRange(newDrugs);
                 await _context.SaveChangesAsync(ct);
 
-                // Reload to get IDs
                 var ndcs = newDrugs.Select(d => d.NDC).ToList();
-                var freshDrugs = await _context.Drugs.Where(d => ndcs.Contains(d.NDC)).ToListAsync(ct);
+
+                var freshDrugs = await _context.Drugs
+                    .Where(d => ndcs.Contains(d.NDC))
+                    .ToListAsync(ct);
+
                 foreach (var d in freshDrugs)
                     drugDict[d.NDC] = d;
             }
 
             // Create DrugClass links
             var newDrugClasses = new List<DrugClass>();
+
             foreach (var (ndc, classIds) in stagedDrugClassLinks)
             {
-                if (!drugDict.TryGetValue(ndc, out var d)) continue;
+                if (!drugDict.TryGetValue(ndc, out var d))
+                    continue;
+
                 foreach (var classId in classIds)
                 {
                     var key = (classId, d.Id);
+
                     if (drugClassKeySet.Add(key))
                     {
-                        newDrugClasses.Add(new DrugClass { ClassId = classId, DrugId = d.Id });
+                        var newDrugClass = new DrugClass
+                        {
+                            ClassId = classId,
+                            DrugId = d.Id
+                        };
 
-                        // Update drugClassMap
+                        newDrugClasses.Add(newDrugClass);
+
                         if (!drugClassMap.ContainsKey(d.Id))
                             drugClassMap[d.Id] = new List<DrugClass>();
-                        drugClassMap[d.Id].Add(new DrugClass { ClassId = classId, DrugId = d.Id });
+
+                        drugClassMap[d.Id].Add(newDrugClass);
                     }
                 }
             }
+
             if (newDrugClasses.Any())
             {
                 _context.DrugClasses.AddRange(newDrugClasses);
@@ -2871,11 +2947,17 @@ namespace SearchTool_ServerSide.Repository
             // Build PCNs
             foreach (var record in processedRecords)
             {
-                if (!insuranceDict.TryGetValue(record.Bin, out var insurance)) continue;
+                if (!insuranceDict.TryGetValue(record.Bin, out var insurance))
+                    continue;
 
                 if (!insurancePCNDict.ContainsKey(record.PCN))
                 {
-                    var insPcn = new InsurancePCN { PCN = record.PCN, InsuranceId = insurance.Id };
+                    var insPcn = new InsurancePCN
+                    {
+                        PCN = record.PCN,
+                        InsuranceId = insurance.Id
+                    };
+
                     newInsurancePCNs.Add(insPcn);
                     insurancePCNDict[record.PCN] = insPcn;
                 }
@@ -2887,7 +2969,11 @@ namespace SearchTool_ServerSide.Repository
                 await _context.SaveChangesAsync(ct);
 
                 var pcns = newInsurancePCNs.Select(p => p.PCN).ToList();
-                var freshPCNs = await _context.InsurancePCNs.Where(p => pcns.Contains(p.PCN)).ToListAsync(ct);
+
+                var freshPCNs = await _context.InsurancePCNs
+                    .Where(p => pcns.Contains(p.PCN))
+                    .ToListAsync(ct);
+
                 foreach (var pcn in freshPCNs)
                     insurancePCNDict[pcn.PCN] = pcn;
             }
@@ -2895,11 +2981,17 @@ namespace SearchTool_ServerSide.Repository
             // Build RxGroups
             foreach (var record in processedRecords)
             {
-                if (!insurancePCNDict.TryGetValue(record.PCN, out var insurancePCN)) continue;
+                if (!insurancePCNDict.TryGetValue(record.PCN, out var insurancePCN))
+                    continue;
 
                 if (!insuranceRxDict.ContainsKey(record.RxGroup))
                 {
-                    var insRx = new InsuranceRx { RxGroup = record.RxGroup, InsurancePCNId = insurancePCN.Id };
+                    var insRx = new InsuranceRx
+                    {
+                        RxGroup = record.RxGroup,
+                        InsurancePCNId = insurancePCN.Id
+                    };
+
                     newInsuranceRxes.Add(insRx);
                     insuranceRxDict[record.RxGroup] = insRx;
                 }
@@ -2911,42 +3003,69 @@ namespace SearchTool_ServerSide.Repository
                 await _context.SaveChangesAsync(ct);
 
                 var rxGroups = newInsuranceRxes.Select(r => r.RxGroup).ToList();
-                var freshRxs = await _context.InsuranceRxes.Where(r => rxGroups.Contains(r.RxGroup)).ToListAsync(ct);
+
+                var freshRxs = await _context.InsuranceRxes
+                    .Where(r => rxGroups.Contains(r.RxGroup))
+                    .ToListAsync(ct);
+
                 foreach (var rx in freshRxs)
                     insuranceRxDict[rx.RxGroup] = rx;
             }
 
-            // Process DrugInsurances and ClassInsurances
+            // ========================================================
+            // PHASE 2B: DrugInsurances and ClassInsurances
+            // ========================================================
             var newDrugInsurances = new List<DrugInsurance>();
-            var updatedDrugInsurances = new List<DrugInsurance>();
             var newClassInsurances = new List<ClassInsurance>();
-            var updatedClassInsurances = new List<ClassInsurance>();
 
             foreach (var record in processedRecords)
             {
                 decimal qty = 1;
+
                 if (!string.Equals(record.Quantity, "tableCell29", StringComparison.OrdinalIgnoreCase)
                     && decimal.TryParse(record.Quantity, NumberStyles.Any, CultureInfo.InvariantCulture, out var q))
                 {
-                    qty = (q == 0 ? 1 : q);
+                    qty = q == 0 ? 1 : q;
                 }
 
-                if (!DateTime.TryParseExact(record.Date, "MM-dd-yy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var rdLocal))
+                if (!DateTime.TryParseExact(
+                        record.Date,
+                        "MM-dd-yy",
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.None,
+                        out var rdLocal))
+                {
                     continue;
+                }
 
                 var recordDate = DateTime.SpecifyKind(rdLocal, DateTimeKind.Unspecified);
                 var recordDateUtc = DateTime.SpecifyKind(recordDate, DateTimeKind.Utc);
 
                 var netTotal = (record.PatientPayment + record.InsurancePayment) - record.AcquisitionCost;
                 var netPerUnit = netTotal / qty;
-                var yearMonth = new DateTime(recordDateUtc.Year, recordDateUtc.Month, 1, 0, 0, 0, DateTimeKind.Utc);
 
-                if (!insuranceRxDict.TryGetValue(record.RxGroup, out var insuranceRx)) continue;
-                if (!drugDict.TryGetValue(record.NDCCode, out var drug)) continue;
-                if (!branchDict.TryGetValue(record.Branch, out var branch)) continue;
+                var yearMonth = new DateTime(
+                    recordDateUtc.Year,
+                    recordDateUtc.Month,
+                    1,
+                    0,
+                    0,
+                    0,
+                    DateTimeKind.Utc
+                );
+
+                if (!insuranceRxDict.TryGetValue(record.RxGroup, out var insuranceRx))
+                    continue;
+
+                if (!drugDict.TryGetValue(record.NDCCode, out var drug))
+                    continue;
+
+                if (!branchDict.TryGetValue(record.Branch, out var branch))
+                    continue;
 
                 // DrugInsurance
                 var diKey = (insuranceRx.Id, drug.Id, branch.Id);
+
                 if (diDict.TryGetValue(diKey, out var existingDI))
                 {
                     if (existingDI.Date < recordDateUtc)
@@ -2959,9 +3078,8 @@ namespace SearchTool_ServerSide.Repository
                         existingDI.PatientPayment = record.PatientPayment;
                         existingDI.Date = recordDateUtc;
                         existingDI.ScriptCode = record.Script;
-
-                        if (!updatedDrugInsurances.Contains(existingDI))
-                            updatedDrugInsurances.Add(existingDI);
+                        existingDI.Prescriber = record.Prescriber;
+                        existingDI.NDCCode = record.NDCCode;
                     }
                 }
                 else
@@ -2980,8 +3098,9 @@ namespace SearchTool_ServerSide.Repository
                         AcquisitionCost = record.AcquisitionCost,
                         Discount = record.Discount,
                         InsurancePayment = record.InsurancePayment,
-                        PatientPayment = record.PatientPayment,
+                        PatientPayment = record.PatientPayment
                     };
+
                     newDrugInsurances.Add(di);
                     diDict.Add(diKey, di);
                 }
@@ -2991,7 +3110,14 @@ namespace SearchTool_ServerSide.Repository
                 {
                     foreach (var link in classLinks)
                     {
-                        var ciKey2 = (insuranceRx.Id, link.ClassId, recordDateUtc.Year, recordDateUtc.Month, branch.Id);
+                        var ciKey2 = (
+                            insuranceRx.Id,
+                            link.ClassId,
+                            recordDateUtc.Year,
+                            recordDateUtc.Month,
+                            branch.Id
+                        );
+
                         if (ciDict.TryGetValue(ciKey2, out var existingCI))
                         {
                             if (netPerUnit > existingCI.BestNet)
@@ -3004,9 +3130,6 @@ namespace SearchTool_ServerSide.Repository
                                 existingCI.Qty = qty;
                                 existingCI.ScriptCode = record.Script;
                                 existingCI.ScriptDateTime = recordDateUtc;
-
-                                if (!updatedClassInsurances.Contains(existingCI))
-                                    updatedClassInsurances.Add(existingCI);
                             }
                         }
                         else
@@ -3027,6 +3150,7 @@ namespace SearchTool_ServerSide.Repository
                                 BestPatientPayment = record.PatientPayment / qty,
                                 Qty = qty
                             };
+
                             newClassInsurances.Add(cii);
                             ciDict.Add(ciKey2, cii);
                         }
@@ -3034,24 +3158,21 @@ namespace SearchTool_ServerSide.Repository
                 }
             }
 
-            // Bulk save DrugInsurances and ClassInsurances
+            // ========================================================
+            // BULK SAVE DrugInsurances and ClassInsurances
+            // ========================================================
             if (newDrugInsurances.Any())
             {
                 _context.DrugInsurances.AddRange(newDrugInsurances);
             }
-            if (updatedDrugInsurances.Any())
-            {
-                _context.DrugInsurances.UpdateRange(updatedDrugInsurances);
-            }
+
             if (newClassInsurances.Any())
             {
                 _context.ClassInsurances.AddRange(newClassInsurances);
             }
-            if (updatedClassInsurances.Any())
-            {
-                _context.ClassInsurances.UpdateRange(updatedClassInsurances);
-            }
 
+            // Existing DrugInsurances/ClassInsurances are already tracked.
+            // EF will save their modified values automatically.
             await _context.SaveChangesAsync(ct);
 
             // ========================================================
@@ -3064,45 +3185,47 @@ namespace SearchTool_ServerSide.Repository
 
             foreach (var record in processedRecords)
             {
-                if (!branchDict.TryGetValue(record.Branch, out var branch)) continue;
-                if (!drugDict.TryGetValue(record.NDCCode, out var drug)) continue;
+                if (!branchDict.TryGetValue(record.Branch, out var branch))
+                    continue;
+
+                if (!drugDict.TryGetValue(record.NDCCode, out var drug))
+                    continue;
 
                 // DrugBranch
                 var tempKey = (branch.Id, drug.NDC);
+
                 if (!drugBranchDict.ContainsKey(tempKey))
                 {
                     var stock = random.Next(10, 101);
-                    var db = new DrugBranch { BranchId = branch.Id, DrugNDC = drug.NDC, Stock = stock };
+
+                    var db = new DrugBranch
+                    {
+                        BranchId = branch.Id,
+                        DrugNDC = drug.NDC,
+                        Stock = stock
+                    };
+
                     newDrugBranches.Add(db);
                     drugBranchDict[tempKey] = db;
                 }
 
-                // Users
-                if (!string.IsNullOrWhiteSpace(record.User) && !userDict.ContainsKey(record.User))
-                {
-                    var u = new User
-                    {
-                        ShortName = record.User,
-                        Name = record.User,
-                        Email = $"{record.User}@pharmacy.com",
-                        Password = BCrypt.Net.BCrypt.HashPassword("DefaultPass123"),
-                        BranchId = branch.Id
-                    };
-                    newUsers.Add(u);
-                    userDict[record.User] = u;
-                }
+            
                 if (!string.IsNullOrWhiteSpace(record.Prescriber) && !userDict.ContainsKey(record.Prescriber))
                 {
+                    var safePrescriberName = record.Prescriber.Trim();
+
                     var p = new User
                     {
-                        ShortName = record.Prescriber,
-                        Name = record.Prescriber,
-                        Email = $"{record.Prescriber}@pharmacy.com",
+                        ShortName = safePrescriberName,
+                        Name = safePrescriberName,
+                        Email = safePrescriberName,
                         Password = BCrypt.Net.BCrypt.HashPassword("DefaultPass123"),
-                        BranchId = branch.Id
+                        BranchId = branch.Id,
+                        Role = Role.Doctor,
                     };
+
                     newUsers.Add(p);
-                    userDict[record.Prescriber] = p;
+                    userDict[safePrescriberName] = p;
                 }
             }
 
@@ -3111,10 +3234,14 @@ namespace SearchTool_ServerSide.Repository
                 _context.Users.AddRange(newUsers);
                 await _context.SaveChangesAsync(ct);
 
-                var shortNames = newUsers.Select(u => u.ShortName).ToList();
-                var freshUsers = await _context.Users.Where(u => shortNames.Contains(u.ShortName)).ToListAsync(ct);
+                var shortNames = newUsers.Select(u => u.Email).ToList();
+
+                var freshUsers = await _context.Users
+                    .Where(u => shortNames.Contains(u.Email))
+                    .ToListAsync(ct);
+
                 foreach (var u in freshUsers)
-                    userDict[u.ShortName] = u;
+                    userDict[u.Email] = u;
             }
 
             if (newDrugBranches.Any())
@@ -3126,14 +3253,27 @@ namespace SearchTool_ServerSide.Repository
             // Scripts
             foreach (var record in processedRecords)
             {
-                if (!DateTime.TryParseExact(record.Date, "MM-dd-yy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var rdLocal))
+                if (!DateTime.TryParseExact(
+                        record.Date,
+                        "MM-dd-yy",
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.None,
+                        out var rdLocal))
+                {
                     continue;
+                }
+
                 var recordDateUtc = DateTime.SpecifyKind(rdLocal, DateTimeKind.Utc);
 
-                if (scriptDict.ContainsKey(record.Script)) continue;
-                if (!branchDict.TryGetValue(record.Branch, out var branch)) continue;
+                if (!branchDict.TryGetValue(record.Branch, out var branch))
+                    continue;
 
-                userDict.TryGetValue(record.User ?? "", out var owner);
+                var scriptKey = (record.Script, branch.Id);
+
+                if (scriptDict.ContainsKey(scriptKey))
+                    continue;
+
+                userDict.TryGetValue(record.Prescriber ?? "", out var owner);
 
                 var sc = new Script
                 {
@@ -3142,8 +3282,9 @@ namespace SearchTool_ServerSide.Repository
                     BranchId = branch.Id,
                     UserId = owner?.Id
                 };
+
                 newScripts.Add(sc);
-                scriptDict[record.Script] = sc;
+                scriptDict[scriptKey] = sc;
             }
 
             if (newScripts.Any())
@@ -3151,10 +3292,15 @@ namespace SearchTool_ServerSide.Repository
                 _context.Scripts.AddRange(newScripts);
                 await _context.SaveChangesAsync(ct);
 
-                var scriptCodes = newScripts.Select(s => s.ScriptCode).ToList();
-                var freshScripts = await _context.Scripts.Where(s => scriptCodes.Contains(s.ScriptCode)).ToListAsync(ct);
+                var scriptCodes = newScripts.Select(s => s.ScriptCode).Distinct().ToList();
+                var branchIds = newScripts.Select(s => s.BranchId).Distinct().ToList();
+
+                var freshScripts = await _context.Scripts
+                    .Where(s => scriptCodes.Contains(s.ScriptCode) && branchIds.Contains(s.BranchId))
+                    .ToListAsync(ct);
+
                 foreach (var s in freshScripts)
-                    scriptDict[s.ScriptCode] = s;
+                    scriptDict[(s.ScriptCode, s.BranchId)] = s;
             }
 
             // ========================================================
@@ -3166,20 +3312,43 @@ namespace SearchTool_ServerSide.Repository
             {
                 record.NDCCode = NormalizeNdcTo11Digits(record.NDCCode);
 
-                if (!DateTime.TryParseExact(record.Date, "MM-dd-yy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var rdLocal))
+                if (!DateTime.TryParseExact(
+                        record.Date,
+                        "MM-dd-yy",
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.None,
+                        out var rdLocal))
+                {
+                    continue;
+                }
+
+                var recordDate = DateTime.SpecifyKind(rdLocal, DateTimeKind.Unspecified);
+                var recordDateUtc = DateTime.SpecifyKind(recordDate, DateTimeKind.Utc);
+
+                if (!insuranceRxDict.TryGetValue(record.RxGroup, out var insurance2))
                     continue;
 
-                DateTime recordDate = DateTime.SpecifyKind(rdLocal, DateTimeKind.Utc);
+                if (!drugDict.TryGetValue(record.NDCCode, out var drug2))
+                    continue;
 
-                if (!insuranceRxDict.TryGetValue(record.RxGroup, out var insurance2)) continue;
-                if (!drugDict.TryGetValue(record.NDCCode, out var drug2)) continue;
-                if (!scriptDict.TryGetValue(record.Script, out var script)) continue;
-                if (!userDict.TryGetValue(record.Prescriber, out var prescriber)) continue;
+                if (!branchDict.TryGetValue(record.Branch, out var branchForScript))
+                    continue;
 
-                var siKey = (script.Id, drug2.Id, recordDate);
-                if (scriptItemDic.ContainsKey(siKey)) continue;
+                var scriptKey = (record.Script, branchForScript.Id);
+
+                if (!scriptDict.TryGetValue(scriptKey, out var script))
+                    continue;
+
+                if (!userDict.TryGetValue(record.Prescriber, out var prescriber))
+                    continue;
+
+                var siKey = (script.Id, drug2.Id, record.RxNumber, recordDateUtc);
+
+                if (scriptItemDic.ContainsKey(siKey))
+                    continue;
 
                 decimal realQTY = 1;
+
                 if (!string.Equals(record.Quantity, "tableCell29", StringComparison.OrdinalIgnoreCase)
                     && decimal.TryParse(record.Quantity, NumberStyles.Any, CultureInfo.InvariantCulture, out var qx))
                 {
@@ -3213,9 +3382,8 @@ namespace SearchTool_ServerSide.Repository
                 await _context.SaveChangesAsync(ct);
             }
 
-            return newScriptItems.Count();
+            return newScriptItems.Count;
         }
-        
         public static string NormalizeNdcTo11Digits(string ndcCode)
         {
             // Remove hyphens
@@ -5209,7 +5377,7 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
                 join scriptItem in _context.ScriptItems on script.Id equals scriptItem.ScriptId
                 join branch in _context.Branches on script.BranchId equals branch.Id
                 join drug in _context.Drugs on scriptItem.DrugId equals drug.Id
-                join insurance in _context.Insurances on scriptItem.InsuranceId equals insurance.Id
+                join insurance in _context.InsuranceRxes on scriptItem.InsuranceId equals insurance.Id
                 join prescriber in _context.Users on scriptItem.UserEmail equals prescriber.Email into prescriberGroup
                 join user in _context.Users on script.UserId equals user.Id
                 from prescriber in prescriberGroup.DefaultIfEmpty() // Allow null prescriber
@@ -5223,7 +5391,7 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
                     NDCCode = scriptItem.NDCCode,
                     Quantity = scriptItem.Quantity,
                     PF = scriptItem.PF,
-                    InsuranceName = insurance.Name,
+                    InsuranceName = insurance.RxGroup,
                     PrescriberName = prescriber != null ? prescriber.Name : "Unknown",
                     UserName = user.Name,
                     AcquisitionCost = scriptItem.AcquisitionCost,
