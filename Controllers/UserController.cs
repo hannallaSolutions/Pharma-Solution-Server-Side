@@ -45,7 +45,6 @@ public async Task<IActionResult> RegisterDemo([FromBody] DemoRegisterDto dto)
 
             var user = await _userService.RegisterDemo(dto);
 
-    var user = await _userService.RegisterDemo(dto);
 
             return Ok(new
             {
