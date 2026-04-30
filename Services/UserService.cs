@@ -23,18 +23,6 @@ namespace SearchTool_ServerSide.Services
             return userReadDto;
         }
 
-        internal async Task<UserReadDto> RegisterDemo(DemoRegisterDto dto)
-        {
-            var user = new User
-            {
-                Email = dto.Email,
-                Name = dto.Email,
-                ShortName = dto.Email,
-                Password = dto.Password,
-                Role = Role.Demo,
-                BranchId = 1
-            };
-
 
 internal async Task<UserReadDto> RegisterDemo(DemoRegisterDto dto)
 {
@@ -65,6 +53,7 @@ var branchDto = new CreateBranchDto
 
    if (createdBranch == null)
         throw new Exception("Failed to create demo main company.");
+        
     var user = new User
     {
         Email = dto.Email,
