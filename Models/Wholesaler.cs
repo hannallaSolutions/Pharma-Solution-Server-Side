@@ -16,6 +16,6 @@
         public DateTime? UpdatedAt { get; set; }
 
         public ICollection<DrugWholesaler> DrugWholesalers { get; set; } = new List<DrugWholesaler>();
-        public ICollection<UserDrugWholesaler> UserDrugWholesalers { get; set; } = new List<UserDrugWholesaler>();
+        public ICollection<DrugWholesalerPrescriber> UserDrugWholesalers { get; set; } = new List<DrugWholesalerPrescriber>();
     }
 }
