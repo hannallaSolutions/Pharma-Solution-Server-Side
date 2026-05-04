@@ -28,11 +28,13 @@ namespace SearchTool_ServerSide.Controllers
             var user = await _userService.Register(userAddDto);
             return Ok(user);
         }
-        [HttpPost("RegisterDemo")]
-        [AllowAnonymous]
-        public async Task<IActionResult> RegisterDemo([FromBody] DemoRegisterDto dto)
-        {
-            var oldUser = await _userService.GetUserByEmail(dto.Email);
+
+
+[HttpPost("RegisterDemo")]
+[AllowAnonymous]
+public async Task<IActionResult> RegisterDemo([FromBody] DemoRegisterDto dto)
+{
+    var oldUser = await _userService.GetUserByEmail(dto.Email);
 
             if (oldUser != null)
             {
@@ -42,6 +44,7 @@ namespace SearchTool_ServerSide.Controllers
             dto.Password = BCrypt.Net.BCrypt.HashPassword(dto.Password);
 
             var user = await _userService.RegisterDemo(dto);
+
 
             return Ok(new
             {
@@ -158,16 +161,19 @@ namespace SearchTool_ServerSide.Controllers
             var user = await _userService.UserUpdate(userId, userUpdateDto);
             return Ok(user);
         }
+        
         [HttpDelete("id")]
-        public async Task<IActionResult> DeleteUserById(int id)
-        {
-            var user = await _userService.DeleteUserById(id);
-            if (user == null)
-            {
-                return BadRequest("NotFound User");
-            }
-            return Ok(user);
-        }
+public async Task<IActionResult> DeleteUserById([FromQuery] int userId)
+{
+    var result = await _userService.DeleteUserById(userId);
+
+    if (!result)
+    {
+        return NotFound(new { message = "User not found" });
+    }
+
+    return Ok(new { message = "User deleted successfully" });
+}
         [HttpGet]
         public async Task<IActionResult> GetAllUser()
         {
@@ -219,5 +225,8 @@ public async Task<IActionResult> EditUser([FromQuery] int userId, [FromBody] Edi
     if (updatedUser == null) return NotFound("User not found");
     return Ok(updatedUser);
 }
+
+
+    
     }
 }

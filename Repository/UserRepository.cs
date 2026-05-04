@@ -91,6 +91,12 @@ namespace SearchTool_ServerSide.Repository
             return true;
         }
       
+      public async Task<int> CountDemoUsers()
+{
+    return await _context.Users
+        .CountAsync(u => u.Role == Role.Demo);
+}
+
 internal async Task<User?> EditUser(int userId, EditUserDto dto)
 {
     var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
@@ -104,5 +110,18 @@ internal async Task<User?> EditUser(int userId, EditUserDto dto)
     await _context.SaveChangesAsync();
     return user;
 }
+
+// delete user by id
+        internal async Task<bool> Delete(int userId)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null) return false;
+
+            _context.Users.Remove(user);
+            await _context.SaveChangesAsync();
+            return true;
+            
     }
+    }
+
 }

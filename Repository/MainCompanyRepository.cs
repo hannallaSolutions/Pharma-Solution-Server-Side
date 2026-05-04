@@ -52,6 +52,13 @@ namespace SearchTool_ServerSide.Repository
             return null;
         }
 
+internal async Task<MainCompany> CreateAsync(MainCompany mainCompany)
+{
+    await _context.MainCompanies.AddAsync(mainCompany);
+    await _context.SaveChangesAsync();
+    return mainCompany;
+}
+
         internal async Task<IEnumerable<MainCompany>> GetAllMainCompaniesAsync()
         {
             return await _context.MainCompanies.ToListAsync();

@@ -7,10 +7,12 @@ using SearchTool_ServerSide.Dtos.UserDtos;
 using SearchTool_ServerSide.Models;
 using SearchTool_ServerSide.Repository;
 using ServerSide;
+using SearchTool_ServerSide.Dtos.BranchDTOs;
 
 namespace SearchTool_ServerSide.Services
 {
-    public class UserSevice(UserRepository _userRepository, IMapper _mapper, JwtOptions jwtOptions, BranchRepository _branchRepository, LogRepository _logRepository)
+    public class UserSevice(UserRepository _userRepository, IMapper _mapper, JwtOptions jwtOptions,
+       MainCompanyRepository _mainCompanyRepository, BranchRepository _branchRepository, LogRepository _logRepository)
     {
         internal async Task<UserReadDto> Register(UserAddDto userAddDto)
         {
@@ -20,22 +22,54 @@ namespace SearchTool_ServerSide.Services
             var userReadDto = _mapper.Map<UserReadDto>(user);
             return userReadDto;
         }
-        internal async Task<UserReadDto> RegisterDemo(DemoRegisterDto dto)
-        {
-            var user = new User
-            {
-                Email = dto.Email,
-                Name = dto.Email,
-                ShortName = dto.Email,
-                Password = dto.Password,
-                Role = Role.Demo,
-                BranchId = 1
-            };
 
-            user = await _userRepository.Add(user);
 
-            return _mapper.Map<UserReadDto>(user);
-        }
+internal async Task<UserReadDto> RegisterDemo(DemoRegisterDto dto)
+{
+    var demoCount = await _userRepository.CountDemoUsers();
+    var n = demoCount + 1;
+
+    var mainCompany = new MainCompany
+    {
+        Name = $"Demo Pharma #{n}",
+        SpecialtyId = 1,
+        ClassTypeId = 2
+    };
+
+var createdMainCompany = await _mainCompanyRepository.CreateAsync(mainCompany);
+
+    if (createdMainCompany == null)
+        throw new Exception("Failed to create demo main company.");
+
+    
+var branchDto = new CreateBranchDto
+{
+    Name = $"Demo Branch #{n}",
+    Location = "Demo Location",
+    Code = $"DEMO-BR-{DateTime.UtcNow.Ticks}",
+    MainCompanyId = createdMainCompany.Id
+};
+    var createdBranch = await _branchRepository.CreateAsync(branchDto);
+
+   if (createdBranch == null)
+        throw new Exception("Failed to create demo main company.");
+        
+    var user = new User
+    {
+        Email = dto.Email,
+        Name = dto.Email,
+        ShortName = dto.Email,
+        Password = BCrypt.Net.BCrypt.HashPassword(dto.Password),
+        Role = Role.Demo,
+        BranchId = createdBranch.Id
+    };
+
+    user = await _userRepository.Add(user);
+
+    return _mapper.Map<UserReadDto>(user);
+}
+
+
         internal async Task<UserReadDto> GetUserByEmail(string email)
         {
             var user = await _userRepository.GetUserByEmail(email);
@@ -144,12 +178,11 @@ namespace SearchTool_ServerSide.Services
             return userReadDto;
         }
 
-        internal async Task<UserReadDto> DeleteUserById(int id)
-        {
-            var user = await _userRepository.Delete(id);
-            var userReadDto = _mapper.Map<UserReadDto>(user);
-            return userReadDto;
-        }
+        
+        internal async Task<bool> DeleteUserById(int id)
+{
+    return await _userRepository.Delete(id);
+}
 
         internal async Task<ICollection<UserReadDto>> GetAllUser()
         {
@@ -187,5 +220,6 @@ namespace SearchTool_ServerSide.Services
             return EditUserDto ;
         }
         
+     
     }
 }
