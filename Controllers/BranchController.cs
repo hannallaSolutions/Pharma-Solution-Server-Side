@@ -44,15 +44,16 @@ namespace SearchTool_ServerSide.Controllers
             var branches = await _branchService.GetAllBranches();
             return Ok(branches);
         }
-        [HttpGet("GetAllMainComapnyBranchesByBranchId")]
-        public async Task<IActionResult> GetAllMainComapnyBranchesByBranchId()
+        //        GetAllMainCompanyBranchesByBranchId
+        [HttpGet("GetAllMainComapanyBranchesByBranchId")]
+        public async Task<IActionResult> GetAllMainComapanyBranchesByBranchId()
         {
             var tokenData = _userAccessToken.tokenData();
             if(tokenData==null || tokenData.BranchId == null)
             {
                 return NotFound("Invalid Data");
             }
-            var branches = await _branchService.GetAllMainComapnyBranchesByBranchId(int.Parse(tokenData.BranchId));
+            var branches = await _branchService.GetAllMainComapanyBranchesByBranchId(int.Parse(tokenData.BranchId));
             return Ok(branches);
         }
         [HttpPost("CreateBranch")]
