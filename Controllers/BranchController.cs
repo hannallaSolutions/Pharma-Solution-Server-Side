@@ -45,15 +45,15 @@ namespace SearchTool_ServerSide.Controllers
             return Ok(branches);
         }
         //        GetAllMainCompanyBranchesByBranchId
-        [HttpGet("GetAllMainComapanyBranchesByBranchId")]
-        public async Task<IActionResult> GetAllMainComapanyBranchesByBranchId()
+        [HttpGet("GetAllMainCompanyBranchesByBranchId")]
+        public async Task<IActionResult> GetAllMainCompanyBranchesByBranchId()
         {
             var tokenData = _userAccessToken.tokenData();
             if(tokenData==null || tokenData.BranchId == null)
             {
                 return NotFound("Invalid Data");
             }
-            var branches = await _branchService.GetAllMainComapanyBranchesByBranchId(int.Parse(tokenData.BranchId));
+            var branches = await _branchService.GetAllMainCompanyBranchesByBranchId(int.Parse(tokenData.BranchId));
             return Ok(branches);
         }
         [HttpPost("CreateBranch")]

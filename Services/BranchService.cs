@@ -17,9 +17,9 @@ namespace SearchTool_ServerSide.Services
             return await _branchRepository.GetAllBranchesByMainCompanyId(mainCompanyId);
         }
 
-        public async Task<ICollection<Branch>> GetAllMainComapanyBranchesByBranchId(int branchId)
+        public async Task<ICollection<Branch>> GetAllMainCompanyBranchesByBranchId(int branchId)
         {
-            return await _branchRepository.GetAllMainComapanyBranchesByBranchId(branchId);
+            return await _branchRepository.GetAllMainCompanyBranchesByBranchId(branchId);
         }
         public async Task<ICollection<Branch>> GetAllBranches()
         {

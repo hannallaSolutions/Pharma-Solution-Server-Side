@@ -30,7 +30,7 @@ namespace SearchTool_ServerSide.Repository
                 .Where(b => b.MainCompanyId == mainCompanyId)
                 .ToListAsync();
         }
-        internal async Task<ICollection<Branch>> GetAllMainComapanyBranchesByBranchId(int branchId)
+        internal async Task<ICollection<Branch>> GetAllMainCompanyBranchesByBranchId(int branchId)
         {
             var branch = await _context.Branches.FirstOrDefaultAsync(x => x.Id == branchId);
             if (branch == null)
