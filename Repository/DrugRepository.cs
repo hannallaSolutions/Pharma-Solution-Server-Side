@@ -3231,7 +3231,10 @@ namespace SearchTool_ServerSide.Repository
 
                 if (!branchDict.TryGetValue(record.Branch, out var branch))
                 {
+                    var tempBranch = _context.Branches.FirstOrDefault(x => x.Code == record.Branch);
                     Console.WriteLine("here : " + record.Branch);
+                    if (tempBranch != null)
+                        Console.WriteLine("temp branch : " + tempBranch.Code);
                     continue;
                 }
 
