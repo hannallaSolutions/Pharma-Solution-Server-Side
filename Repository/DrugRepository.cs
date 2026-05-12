@@ -3228,8 +3228,12 @@ namespace SearchTool_ServerSide.Repository
 
             foreach (var record in processedRecords)
             {
+
                 if (!branchDict.TryGetValue(record.Branch, out var branch))
+                {
+                    Console.WriteLine("here : " + record.Branch);
                     continue;
+                }
 
                 if (!drugDict.TryGetValue(record.NDCCode, out var drug))
                     continue;
