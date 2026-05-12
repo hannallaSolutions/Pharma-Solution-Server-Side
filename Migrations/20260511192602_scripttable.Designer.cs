@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SearchTool_ServerSide.Data;
@@ -11,9 +12,11 @@ using SearchTool_ServerSide.Data;
 namespace SearchTool_ServerSide.Migrations
 {
     [DbContext(typeof(SearchToolDBContext))]
-    partial class SearchToolDBContextModelSnapshot : ModelSnapshot
+    [Migration("20260511192602_scripttable")]
+    partial class scripttable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -343,7 +346,7 @@ namespace SearchTool_ServerSide.Migrations
                         {
                             Id = 1,
                             Mode = 1,
-                            UpdatedAt = new DateTime(2026, 5, 11, 19, 42, 26, 461, DateTimeKind.Utc).AddTicks(8799)
+                            UpdatedAt = new DateTime(2026, 5, 11, 19, 26, 2, 99, DateTimeKind.Utc).AddTicks(5746)
                         });
                 });
 
@@ -1266,26 +1269,14 @@ namespace SearchTool_ServerSide.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<decimal?>("AWP")
-                        .HasColumnType("numeric");
-
                     b.Property<decimal>("AcquisitionCost")
                         .HasColumnType("numeric");
-
-                    b.Property<int?>("DaySupply")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("DaySupplyEndDate")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal>("Discount")
                         .HasColumnType("numeric");
 
                     b.Property<int>("DrugId")
                         .HasColumnType("integer");
-
-                    b.Property<decimal?>("GrossProfit")
-                        .HasColumnType("numeric");
 
                     b.Property<int>("InsuranceId")
                         .HasColumnType("integer");
@@ -1313,12 +1304,6 @@ namespace SearchTool_ServerSide.Migrations
                     b.Property<decimal>("Quantity")
                         .HasColumnType("numeric");
 
-                    b.Property<int?>("Refill")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("RefillDate")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<int>("RemainingStock")
                         .HasColumnType("integer");
 
@@ -1329,24 +1314,15 @@ namespace SearchTool_ServerSide.Migrations
                     b.Property<string>("RxStatus")
                         .HasColumnType("text");
 
-                    b.Property<decimal?>("SDRA")
-                        .HasColumnType("numeric");
-
                     b.Property<int>("ScriptId")
                         .HasColumnType("integer");
 
                     b.Property<string>("Status")
                         .HasColumnType("text");
 
-                    b.Property<string>("Unit")
-                        .HasColumnType("text");
-
                     b.Property<string>("UserEmail")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<decimal?>("WAC")
-                        .HasColumnType("numeric");
 
                     b.HasKey("Id");
 

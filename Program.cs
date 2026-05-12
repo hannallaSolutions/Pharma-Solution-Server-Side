@@ -74,6 +74,8 @@ builder.Services.AddScoped<MainCompanyRepository>();
 builder.Services.AddScoped<DrugClassRepository>();
 builder.Services.AddScoped<BranchRepository>();
 builder.Services.AddScoped<DiseaseRepository>();
+builder.Services.AddScoped<DrugWholesalerPrescriberRepository>();
+
 //////////////////////////////////////////////
 builder.Services.AddScoped<NadacService>();
 builder.Services.AddScoped<OrderService>();
@@ -87,6 +89,8 @@ builder.Services.AddScoped<FeedbackService>();
 builder.Services.AddScoped<DrugClassService>();
 builder.Services.AddScoped<BranchService>();
 builder.Services.AddScoped<DiseaseService>();
+builder.Services.AddScoped<DrugWholesalerPrescriberService>();
+
 builder.Services.AddScoped<IChatOrchestratorService, ChatOrchestratorService>();
 
 //for email campaign
@@ -153,7 +157,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-//app.UseCors("CorsPolicy");
+app.UseCors("CorsPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<UserLogsMiddleware>();

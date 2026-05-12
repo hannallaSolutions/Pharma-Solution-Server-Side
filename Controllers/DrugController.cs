@@ -276,8 +276,8 @@ namespace SearchTool_ServerSide.Controllers
         public async Task<IActionResult> GetAllLatestScriptsPaginated([FromQuery] int pageNumber, [FromQuery] int pageSize, [FromQuery] string classVersion = "ClassV1", [FromQuery] string matchOn = "BIN")
         {
             var userData = userAccessToken.tokenData();
-            int mainCompanyId = branchService.GetMainCompanyByBranchId(int.Parse(userData.BranchId)).Id;
-            var items = await _drugService.GetAllLatestScriptsPaginated(pageNumber, pageSize, classVersion, matchOn,mainCompanyId,int.Parse(userData.BranchId));
+            var mainCompanyId = await branchService.GetMainCompanyByBranchId(int.Parse(userData.BranchId));
+            var items = await _drugService.GetAllLatestScriptsPaginated(pageNumber, pageSize, classVersion, matchOn, mainCompanyId.Id, int.Parse(userData.BranchId));
             return Ok(items);
         }
         [HttpGet("GetAllLatestScriptsPaginatedv2"), Authorize]

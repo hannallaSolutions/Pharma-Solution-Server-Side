@@ -2695,6 +2695,33 @@ namespace SearchTool_ServerSide.Repository
             var processedRecords = new List<ScriptRecord>();
             var ci = StringComparer.OrdinalIgnoreCase;
 
+            // ── Accepted date formats from client CSVs ──
+            var dateFormats = new[]
+            {
+        "yyyy-MM-dd",
+        "MM-dd-yy",
+        "MM/dd/yyyy",
+        "M/d/yyyy",
+        "yyyy-MM-dd HH:mm:ss",
+        "MM/dd/yy"
+    };
+
+            // ── Helper: parse any of the supported date formats ──
+            bool TryParseRecordDate(string raw, out DateTime parsed)
+            {
+                parsed = default;
+
+                if (string.IsNullOrWhiteSpace(raw))
+                    return false;
+
+                if (DateTime.TryParseExact(raw.Trim(), dateFormats, CultureInfo.InvariantCulture,
+                                           DateTimeStyles.None, out parsed))
+                    return true;
+
+                return DateTime.TryParse(raw.Trim(), CultureInfo.InvariantCulture,
+                                         DateTimeStyles.None, out parsed);
+            }
+
             // ========================================================
             // LOAD ALL DATA UPFRONT
             // ========================================================
@@ -2806,6 +2833,12 @@ namespace SearchTool_ServerSide.Repository
                 record.Branch = (record.Branch ?? "").Trim();
                 record.NDCCode = NormalizeNdcTo11Digits(record.NDCCode);
 
+                // ── Normalize status fields ──
+                record.Status = (record.Status ?? "").Trim();
+                record.RxStatus = (record.RxStatus ?? "").Trim();
+                record.Priority = (record.Priority ?? "").Trim();
+                record.Unit = (record.Unit ?? "").Trim();
+
                 if (record.Bin.Length < 6)
                     record.Bin = record.Bin.PadLeft(6, '0');
 
@@ -2842,7 +2875,8 @@ namespace SearchTool_ServerSide.Repository
                             Form = template.Form,
                             Strength = template.Strength,
                             ACQ = record.AcquisitionCost,
-                            AWP = 0,
+                            // ── CHANGED: populate AWP from CSV if available, otherwise fall back to template, otherwise 0 ──
+                            AWP = record.AWP ?? template.AWP,
                             Rxcui = template.Rxcui,
                             Route = template.Route,
                             Ingrdient = template.Ingrdient,
@@ -2865,6 +2899,15 @@ namespace SearchTool_ServerSide.Repository
                     else
                     {
                         continue;
+                    }
+                }
+                else
+                {
+                    // ── If drug exists but has no AWP and the CSV provides one, update it ──
+                    if ((drug.AWP == 0) && record.AWP.HasValue && record.AWP.Value > 0)
+                    {
+                        drug.AWP = record.AWP.Value;
+                        _context.Drugs.Update(drug);
                     }
                 }
 
@@ -3020,6 +3063,12 @@ namespace SearchTool_ServerSide.Repository
 
             foreach (var record in processedRecords)
             {
+                // ── Skip cancelled scripts for DrugInsurance/ClassInsurance ──
+                // These tables drive the "best alternative" optimization logic,
+                // and cancelled scripts should not influence that comparison.
+                if (string.Equals(record.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
                 decimal qty = 1;
 
                 if (!string.Equals(record.Quantity, "tableCell29", StringComparison.OrdinalIgnoreCase)
@@ -3028,15 +3077,9 @@ namespace SearchTool_ServerSide.Repository
                     qty = q == 0 ? 1 : q;
                 }
 
-                if (!DateTime.TryParseExact(
-                        record.Date,
-                        "MM-dd-yy",
-                        CultureInfo.InvariantCulture,
-                        DateTimeStyles.None,
-                        out var rdLocal))
-                {
+                // ── CHANGED: multi-format date parsing ──
+                if (!TryParseRecordDate(record.Date, out var rdLocal))
                     continue;
-                }
 
                 var recordDate = DateTime.SpecifyKind(rdLocal, DateTimeKind.Unspecified);
                 var recordDateUtc = DateTime.SpecifyKind(recordDate, DateTimeKind.Utc);
@@ -3209,7 +3252,7 @@ namespace SearchTool_ServerSide.Repository
                     drugBranchDict[tempKey] = db;
                 }
 
-            
+
                 if (!string.IsNullOrWhiteSpace(record.Prescriber) && !userDict.ContainsKey(record.Prescriber))
                 {
                     var safePrescriberName = record.Prescriber.Trim();
@@ -3253,15 +3296,9 @@ namespace SearchTool_ServerSide.Repository
             // Scripts
             foreach (var record in processedRecords)
             {
-                if (!DateTime.TryParseExact(
-                        record.Date,
-                        "MM-dd-yy",
-                        CultureInfo.InvariantCulture,
-                        DateTimeStyles.None,
-                        out var rdLocal))
-                {
+                // ── CHANGED: multi-format date parsing ──
+                if (!TryParseRecordDate(record.Date, out var rdLocal))
                     continue;
-                }
 
                 var recordDateUtc = DateTime.SpecifyKind(rdLocal, DateTimeKind.Utc);
 
@@ -3312,15 +3349,9 @@ namespace SearchTool_ServerSide.Repository
             {
                 record.NDCCode = NormalizeNdcTo11Digits(record.NDCCode);
 
-                if (!DateTime.TryParseExact(
-                        record.Date,
-                        "MM-dd-yy",
-                        CultureInfo.InvariantCulture,
-                        DateTimeStyles.None,
-                        out var rdLocal))
-                {
+                // ── CHANGED: multi-format date parsing ──
+                if (!TryParseRecordDate(record.Date, out var rdLocal))
                     continue;
-                }
 
                 var recordDate = DateTime.SpecifyKind(rdLocal, DateTimeKind.Unspecified);
                 var recordDateUtc = DateTime.SpecifyKind(recordDate, DateTimeKind.Utc);
@@ -3355,6 +3386,19 @@ namespace SearchTool_ServerSide.Repository
                     realQTY = qx == 0 ? 1 : qx;
                 }
 
+                // ── Parse optional date fields (Day Supply End Date, Refill Date) ──
+                DateTime? daySupplyEndDate = null;
+                if (TryParseRecordDate(record.DaySupplyEndDate, out var dseTmp))
+                {
+                    daySupplyEndDate = DateTime.SpecifyKind(dseTmp, DateTimeKind.Utc);
+                }
+
+                DateTime? refillDate = null;
+                if (TryParseRecordDate(record.RefillDate, out var rdTmp))
+                {
+                    refillDate = DateTime.SpecifyKind(rdTmp, DateTimeKind.Utc);
+                }
+
                 var newSI = new ScriptItem
                 {
                     ScriptId = script.Id,
@@ -3369,7 +3413,28 @@ namespace SearchTool_ServerSide.Repository
                     Discount = record.Discount,
                     InsurancePayment = record.InsurancePayment,
                     PatientPayment = record.PatientPayment,
-                    NDCCode = record.NDCCode
+                    NDCCode = record.NDCCode,
+
+                    // ── NEW: NP verification fields ──
+                    OriginalNetProfit = record.OriginalNetProfit,
+                    GrossProfit = record.GrossProfit,
+
+                    // ── NEW: Pricing references ──
+                    AWP = record.AWP,
+                    WAC = record.WAC,
+                    SDRA = record.SDRA,
+
+                    // ── NEW: Day Supply & Refill ──
+                    Refill = record.Refill,
+                    DaySupply = record.DaySupply,
+                    DaySupplyEndDate = daySupplyEndDate,
+                    RefillDate = refillDate,
+                    Unit = string.IsNullOrWhiteSpace(record.Unit) ? null : record.Unit,
+
+                    // ── NEW: Status fields ──
+                    Status = string.IsNullOrWhiteSpace(record.Status) ? null : record.Status,
+                    RxStatus = string.IsNullOrWhiteSpace(record.RxStatus) ? null : record.RxStatus,
+                    Priority = string.IsNullOrWhiteSpace(record.Priority) ? null : record.Priority
                 };
 
                 newScriptItems.Add(newSI);
@@ -3384,6 +3449,8 @@ namespace SearchTool_ServerSide.Repository
 
             return newScriptItems.Count;
         }
+
+
         public static string NormalizeNdcTo11Digits(string ndcCode)
         {
             // Remove hyphens
@@ -3397,6 +3464,7 @@ namespace SearchTool_ServerSide.Repository
             // Return original if it matches the 11-digit format already
             return ndcCode;
         }
+
         public async Task<DrugInsurance> GetBySelection(string name, string ndc, string insuranceName)
         {
             var insurance = await _context.Insurances.FirstOrDefaultAsync(x => x.Name == insuranceName);
@@ -4888,57 +4956,124 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
         }
         public class ScriptRecord
         {
-            [Name("Date")]
+            // ── Date & Identification ──
+            [Name("Date Filled")]
             public string Date { get; set; }
 
             [Name("Script")]
             public string Script { get; set; }
-            [Name("RxGroup")]
-            public string RxGroup { get; set; }
-            [Name("Bin")]
+
+            [Name("Rx Number")]
+            public string RxNumber { get; set; }
+
+            [Name("Refill")]
+            public int? Refill { get; set; }
+
+            // ── Insurance Routing ──
+            [Name("Insurance")]
+            public string Insurance { get; set; }
+
+            [Name("BIN")]
             public string Bin { get; set; }
+
             [Name("PCN")]
             public string PCN { get; set; }
 
-            [Name("R#")]
-            public string RxNumber { get; set; }
+            [Name("Group")]
+            public string RxGroup { get; set; }
 
+            // ── User & Prescriber ──
             [Name("User")]
             public string? User { get; set; }
-
-            [Name("Drug Name")]
-            public string DrugName { get; set; }
-
-            [Name("Ins")]
-            public string Insurance { get; set; }
-
-            [Name("PF")]
-            public string PF { get; set; }
 
             [Name("Prescriber")]
             public string Prescriber { get; set; }
 
-            [Name("Qty")]
+            [Name("Office")]
+            public string Branch { get; set; }
+
+            // ── Drug Identification ──
+            [Name("Dispensed Item")]
+            public string DrugName { get; set; }
+
+            [Name("NDC")]
+            public string NDCCode { get; set; }
+
+            [Name("Unit")]
+            public string? Unit { get; set; }
+
+            // ── Quantity & Day Supply ──
+            [Name("Quantity")]
             public string Quantity { get; set; }
+
+            [Name("Day Supply")]
+            public int? DaySupply { get; set; }
+
+            [Name("Day Supply \nEnd Date")]
+            public string? DaySupplyEndDate { get; set; }
+
+            [Name("Refill Date")]
+            public string? RefillDate { get; set; }
+
+            // ── Pricing ──
+            [Name("AWP")]
+            public decimal? AWP { get; set; }
+
+            [Name("WAC")]
+            public decimal? WAC { get; set; }
 
             [Name("ACQ")]
             public decimal AcquisitionCost { get; set; }
 
-            [Name("Discount")]
-            public decimal Discount { get; set; }
-
-            [Name("Ins Pay")]
-            public decimal InsurancePayment { get; set; }
-
-            [Name("Pat Pay")]
+            [Name("Copay")]
             public decimal PatientPayment { get; set; }
-            [Name("Branch")]
-            public string Branch { get; set; }
-            [Name("NDC")]
-            public string NDCCode { get; set; }
+
+            [Name("SDRA")]
+            public decimal? SDRA { get; set; }
+
+            // ── Net Profit (source system) ──
+            [Name("NP")]
+            public decimal? OriginalNetProfit { get; set; }
+
+            [Name("GP")]
+            public decimal? GrossProfit { get; set; }
+
+            // ── Status Fields ──
+            [Name("Status")]
+            public string? Status { get; set; }
+
+            [Name("Rx Status")]
+            public string? RxStatus { get; set; }
+
+            [Name("Priority")]
+            public string? Priority { get; set; }
+
+            // ── Discount kept for backwards compatibility ──
+            public decimal Discount { get; set; } = 0;
+
+            // ── PF kept for backwards compatibility ──
+            public string PF { get; set; } = "INS";
+
+            // ── Derived field — Insurance Payment ──
+            // The client's CSV does not have an explicit "Ins Pay" column.
+            // It is reverse-calculated from NP + ACQ - Copay.
+            // SDRA, when populated, IS the insurance payment directly.
+            public decimal InsurancePayment
+            {
+                get
+                {
+                    if (SDRA.HasValue && SDRA.Value > 0)
+                        return SDRA.Value;
+
+                    if (OriginalNetProfit.HasValue)
+                        return OriginalNetProfit.Value + AcquisitionCost - PatientPayment;
+
+                    return 0;
+                }
+            }
+
             public int RemainingStock { get; set; } = 0;
         }
-
 
         public class DrugCs
         {
@@ -5025,24 +5160,66 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
 
         }
 
-        private async Task<List<AuditReadDto>> GetAuditDtosWithBestBeforeOrPrevMonthAsync(string classTypeName, string matchOn, int mainCompanyId, int branchId)
+        private async Task<List<AuditReadDto>> GetAuditDtosWithBestBeforeOrPrevMonthAsync(
+            string classTypeName,
+            string matchOn,
+            int mainCompanyId,
+            int branchId,
+            bool includeCancelled = true)
         {
-            var isClassV6 = string.Equals(classTypeName, "ClassV6", StringComparison.OrdinalIgnoreCase);
+            var useAllMatchingClasses = string.Equals(
+                classTypeName,
+                "ClassV10",
+                StringComparison.OrdinalIgnoreCase
+            );
 
-            var scriptItems = await _context.ScriptItems
+            // ========================================================
+            // Load ScriptItems
+            // ========================================================
+            var query = _context.ScriptItems
                 .AsNoTracking()
-                .Include(si => si.Script).ThenInclude(s => s.Branch)
-                .Include(si => si.Drug).ThenInclude(d => d.DrugClasses).ThenInclude(dc => dc.ClassInfo).ThenInclude(ci => ci.ClassType)
+                .Include(si => si.Script)
+                    .ThenInclude(s => s.Branch)
+                .Include(si => si.Drug)
+                    .ThenInclude(d => d.DrugClasses)
+                        .ThenInclude(dc => dc.ClassInfo)
+                            .ThenInclude(ci => ci.ClassType)
                 .Include(si => si.Insurance)
                     .ThenInclude(irx => irx.InsurancePCN)
                         .ThenInclude(pcn => pcn.Insurance)
                 .Include(si => si.Prescriber)
-                .Where(si => si.Script.BranchId == branchId  && si.Drug.DrugClasses.Any(dc => dc.ClassInfo.ClassType.Name == classTypeName))
-                .ToListAsync();
+                .Where(si =>
+                    si.Script.Branch.MainCompanyId == mainCompanyId &&
+                    si.Drug.DrugClasses.Any(dc =>
+                        dc.ClassInfo.ClassType.Name == classTypeName
+                    )
+                );
 
-            if (!scriptItems.Any()) return new();
+            // Optional filter: hide cancelled if needed
+            if (!includeCancelled)
+            {
+                query = query.Where(si =>
+                    si.Status == null ||
+                    si.Status != "Cancelled"
+                );
+            }
 
-            // Load all ClassInsurances (+ BIN/PCN navigation)
+            // Optional branch filter:
+            // If branchId > 0, return only this branch.
+            // If branchId <= 0, return all branches for the company.
+            //if (branchId > 0)
+            //{
+            //    query = query.Where(si => si.Script.BranchId == branchId);
+            //}
+
+            var scriptItems = await query.ToListAsync();
+
+            if (!scriptItems.Any())
+                return new List<AuditReadDto>();
+
+            // ========================================================
+            // Load ClassInsurances
+            // ========================================================
             var classInsurances = await _context.ClassInsurances
                 .AsNoTracking()
                 .Include(ci => ci.Drug)
@@ -5051,12 +5228,15 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
                         .ThenInclude(pcn => pcn.Insurance)
                 .ToListAsync();
 
-            // Group by (BranchId, <match>, ClassInfoId)
+            // ========================================================
+            // Group ClassInsurances by:
+            // BranchId + selected match value + ClassInfoId
+            // ========================================================
             var ciGroups = classInsurances
                 .Where(ci => ci.Insurance?.InsurancePCN?.Insurance?.Bin != null)
                 .GroupBy(ci =>
                 {
-                    string? matchValue = matchOn.ToUpper() switch
+                    string? matchValue = matchOn.ToUpperInvariant() switch
                     {
                         "BIN" => ci.Insurance?.InsurancePCN?.Insurance?.Bin,
                         "PCN" => ci.Insurance?.InsurancePCN?.PCN,
@@ -5074,68 +5254,94 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
                 .Where(g => g.Key.Match != null)
                 .ToDictionary(g => g.Key, g => g.ToList());
 
-            // RemainingStock dictionary
+            // ========================================================
+            // Remaining Stock dictionary for highest alternative
+            // ========================================================
             var stockDict = scriptItems
                 .GroupBy(si => (si.Script.ScriptCode, si.DrugId))
                 .ToDictionary(g => g.Key, g => g.First().RemainingStock);
 
             var auditDtos = new List<AuditReadDto>();
 
+            // ========================================================
+            // Build DTOs
+            // ========================================================
             foreach (var si in scriptItems)
             {
                 var scriptDate = si.Script.Date.ToUniversalTime();
                 var prevMonth = StartOfMonth(scriptDate).AddMonths(-1);
 
-                // All ClassInfoIds for this drug under the given classType
                 var classInfoIdsForDrug = si.Drug.DrugClasses
                     .Where(dc => dc.ClassInfo.ClassType.Name == classTypeName)
                     .Select(dc => dc.ClassId)
                     .Distinct()
                     .ToList();
 
-                // If you still want to show which class name we selected the drug from:
-                var firstMatchingClass = si.Drug.DrugClasses.First(dc => dc.ClassInfo.ClassType.Name == classTypeName);
+                if (!classInfoIdsForDrug.Any())
+                    continue;
 
-                string? matchValue = matchOn.ToUpper() switch
+                var firstMatchingClass = si.Drug.DrugClasses
+                    .First(dc => dc.ClassInfo.ClassType.Name == classTypeName);
+
+                string? matchValue = matchOn.ToUpperInvariant() switch
                 {
                     "BIN" => si.Insurance?.InsurancePCN?.Insurance?.Bin,
                     "PCN" => si.Insurance?.InsurancePCN?.PCN,
                     "RX" => si.Insurance?.RxGroup,
                     _ => null
                 };
-                if (matchValue == null) continue;
+
+                if (matchValue == null)
+                    continue;
 
                 ClassInsurance? bestAlt = null;
 
-                if (isClassV6)
+                // ========================================================
+                // Find Best Alternative
+                // ========================================================
+                if (useAllMatchingClasses)
                 {
-                    // ✅ ClassV6: consider ALL classInfos for this drug, pick the single best by BestNet.
-                    // Build one combined candidate set across all matching ClassInfoIds.
+                    // ClassV10 behavior:
+                    // Use ALL matching ClassInfoIds for this drug,
+                    // then pick the best candidate.
                     var candidates = new List<ClassInsurance>();
-                    foreach (var cid in classInfoIdsForDrug)
+
+                    foreach (var classInfoId in classInfoIdsForDrug)
                     {
-                        var key = new { si.Script.BranchId, Match = matchValue, ClassInfoId = cid };
-                        if (ciGroups.TryGetValue(key, out var ciList) && ciList is not null)
+                        var key = new
+                        {
+                            si.Script.BranchId,
+                            Match = matchValue,
+                            ClassInfoId = classInfoId
+                        };
+
+                        if (ciGroups.TryGetValue(key, out var ciList) && ciList != null)
+                        {
                             candidates.AddRange(ciList);
+                        }
                     }
 
                     if (candidates.Count > 0)
                     {
-                        // Prefer previous month, choose highest BestNet there; else most recent ≤ script date, highest BestNet.
-                        bestAlt =
-                            candidates.Where(ci => StartOfMonth(ci.Date) == prevMonth)
-                                      .OrderByDescending(ci => ci.BestNet)
-                                      .ThenByDescending(ci => ci.Date)
-                                      .FirstOrDefault()
-                            ?? candidates.Where(ci => ci.Date <= scriptDate)
-                                         .OrderByDescending(ci => ci.BestNet)
-                                         .ThenByDescending(ci => ci.Date)
-                                         .FirstOrDefault();
+                        // First: previous month, highest BestNet
+                        bestAlt = candidates
+                            .Where(ci => StartOfMonth(ci.Date) == prevMonth)
+                            .OrderByDescending(ci => ci.BestNet)
+                            .ThenByDescending(ci => ci.Date)
+                            .FirstOrDefault();
+
+                        // Fallback: most recent <= script date, highest BestNet
+                        bestAlt ??= candidates
+                            .Where(ci => ci.Date <= scriptDate)
+                            .OrderByDescending(ci => ci.Date)
+                            .ThenByDescending(ci => ci.BestNet)
+                            .FirstOrDefault();
                     }
                 }
                 else
                 {
-                    // Original behavior: use the first matching ClassInfoId for this drug
+                    // Original behavior:
+                    // Use only the first matching class.
                     var drugClassInfoId = firstMatchingClass.ClassId;
 
                     var key = new
@@ -5147,74 +5353,148 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
 
                     if (ciGroups.TryGetValue(key, out var ciList))
                     {
-                        // First try: previous month (highest BestNet)
+                        // First: previous month, highest BestNet
                         bestAlt = ciList
                             .Where(ci => StartOfMonth(ci.Date) == prevMonth)
                             .OrderByDescending(ci => ci.BestNet)
                             .FirstOrDefault();
 
-                        // Fallback: most recent ≤ scriptDate, then BestNet
-                        if (bestAlt == null)
-                        {
-                            bestAlt = ciList
-                                .Where(ci => ci.Date <= scriptDate)
-                                .OrderByDescending(ci => ci.Date)
-                                .ThenByDescending(ci => ci.BestNet)
-                                .FirstOrDefault();
-                        }
+                        // Fallback: most recent <= script date, then BestNet
+                        bestAlt ??= ciList
+                            .Where(ci => ci.Date <= scriptDate)
+                            .OrderByDescending(ci => ci.Date)
+                            .ThenByDescending(ci => ci.BestNet)
+                            .FirstOrDefault();
                     }
                 }
 
+                // ========================================================
+                // NP Verification Calculations
+                // ========================================================
+                var quantity = si.Quantity <= 0 ? 1 : si.Quantity;
+                var calculatedNetProfit = si.NetProfit;
+                var calculatedNetProfitPerItem = calculatedNetProfit / quantity;
+
+                decimal? originalNetProfitPerItem = null;
+                decimal? npDiscrepancyPerItem = null;
+                string npComparisonStatus = "No Source NP";
+
+                if (si.OriginalNetProfit.HasValue)
+                {
+                    originalNetProfitPerItem = si.OriginalNetProfit.Value / quantity;
+                    npDiscrepancyPerItem = (si.NPDiscrepancy ?? 0) / quantity;
+
+                    var absDiff = Math.Abs(si.NPDiscrepancy ?? 0);
+
+                    npComparisonStatus = absDiff switch
+                    {
+                        <= 0.01m => "Matched",
+                        <= 1.00m => "Small Difference",
+                        _ => "Different"
+                    };
+                }
+
+                // ========================================================
+                // Main DTO
+                // ========================================================
                 var dto = new AuditReadDto
                 {
+                    // Current Script Info
                     Date = si.Script.Date,
-                    RemainingStock = si.RemainingStock,
                     ScriptCode = si.Script.ScriptCode,
                     RxNumber = si.RxNumber,
-                    User = (si.UserEmail ?? "").Replace(".@pharmacy.com", ""),
-                    Prescriber = si.Prescriber?.Name ?? "",
-                    DrugName = si.Drug.Name,
+                    BranchCode = si.Script.Branch.Code,
+                    BranchName = si.Script.Branch.Name,
+
+                    // Current Drug Info
                     DrugId = si.DrugId,
+                    DrugName = si.Drug.Name,
+                    NDCCode = si.NDCCode,
+                    DrugClass = firstMatchingClass.ClassInfo.Name,
+
+                    // Current Insurance Info
+                    InsuranceId = si.InsuranceId,
+                    RxGroupId = si.Insurance?.Id ?? 0,
+                    PcnId = si.Insurance?.InsurancePCN?.Id ?? 0,
+                    BinId = si.Insurance?.InsurancePCN?.Insurance?.Id ?? 0,
                     InsuranceRx = si.Insurance?.RxGroup ?? "",
                     BINCode = si.Insurance?.InsurancePCN?.Insurance?.Bin ?? "",
                     BINName = si.Insurance?.InsurancePCN?.Insurance?.Name ?? "",
                     PCNName = si.Insurance?.InsurancePCN?.PCN ?? "",
-                    RxGroupId = si.Insurance?.Id ?? 1,
-                    PcnId = si.Insurance?.InsurancePCN?.Id ?? 1, // ✅ NRE-safe
-                    BinId = si.Insurance?.InsurancePCN?.Insurance?.Id ?? 1,
-                    InsuranceId = si.InsuranceId,
+
+                    // User / Prescriber
+                    User = (si.UserEmail ?? "").Replace(".@pharmacy.com", ""),
+                    Prescriber = si.Prescriber?.Name ?? "",
+
+                    // Current Financial Values
                     PF = si.PF,
                     Quantity = si.Quantity,
+                    RemainingStock = si.RemainingStock,
                     AcquisitionCost = si.AcquisitionCost,
                     Discount = si.Discount,
                     InsurancePayment = si.InsurancePayment,
                     PatientPayment = si.PatientPayment,
-                    NetProfit = si.NetProfit,
-                    NDCCode = si.NDCCode,
-                    DrugClass = firstMatchingClass.ClassInfo.Name, // display a class name for context
-                    BranchCode = si.Script.Branch.Code,
-                    NetProfitPerItem = si.NetProfit / Math.Max(1, si.Quantity),
+                    NetProfit = calculatedNetProfit,
+                    NetProfitPerItem = calculatedNetProfitPerItem,
+
+                    // Source NP Comparison
+                    OriginalNetProfit = si.OriginalNetProfit,
+                    OriginalNetProfitPerItem = originalNetProfitPerItem,
+                    NPDiscrepancy = si.NPDiscrepancy,
+                    NPDiscrepancyPerItem = npDiscrepancyPerItem,
+                    NPComparisonStatus = npComparisonStatus,
+                    GrossProfit = si.GrossProfit,
+
+                    // Pricing Reference Fields
+                    AWP = si.AWP ?? si.Drug.AWP,
+                    WAC = si.WAC,
+                    SDRA = si.SDRA,
+                    ReimbursementRatePctOfAWP = ComputeReimbursementRate(si),
+
+                    // Supply / Refill Fields
+                    Refill = si.Refill,
+                    DaySupply = si.DaySupply,
+                    DaySupplyEndDate = si.DaySupplyEndDate,
+                    RefillDate = si.RefillDate,
+                    Unit = si.Unit,
+
+                    // Status Fields
+                    Status = si.Status,
+                    RxStatus = si.RxStatus,
+                    Priority = si.Priority
                 };
 
+                // ========================================================
+                // Highest Alternative Mapping
+                // ========================================================
                 if (bestAlt != null)
                 {
                     dto.HighestDrugId = bestAlt.DrugId;
                     dto.HighestDrugName = bestAlt.Drug?.Name ?? "";
                     dto.HighestDrugNDC = bestAlt.Drug?.NDC ?? "";
-                    dto.HighestNet = bestAlt.BestNet * bestAlt.Qty;
+
+                    // Use current script quantity, not best alternative quantity.
+                    dto.HighestNet = bestAlt.BestNet * quantity;
+
                     dto.HighestScriptCode = bestAlt.ScriptCode;
                     dto.HighestScriptDate = bestAlt.ScriptDateTime;
                     dto.HighestNetProfitPerItem = bestAlt.BestNet;
                     dto.HighestQuantity = bestAlt.Qty;
+
                     dto.HighestBINCode = bestAlt.Insurance?.InsurancePCN?.Insurance?.Bin ?? "";
                     dto.HighestBINName = bestAlt.Insurance?.InsurancePCN?.Insurance?.Name ?? "";
                     dto.HighestPCNName = bestAlt.Insurance?.InsurancePCN?.PCN ?? "";
                     dto.HighestInsuranceRx = bestAlt.Insurance?.RxGroup ?? "";
-                    dto.HighestRxGroupId = bestAlt.InsuranceId;
-                    dto.HighestPcnId = bestAlt.Insurance?.InsurancePCN?.Id ?? 1;
-                    dto.HighestBinId = bestAlt.Insurance?.InsurancePCN?.Insurance?.Id ?? 1;
 
-                    stockDict.TryGetValue((bestAlt.ScriptCode, bestAlt.DrugId), out int altRemainingStock);
+                    dto.HighestRxGroupId = bestAlt.InsuranceId;
+                    dto.HighestPcnId = bestAlt.Insurance?.InsurancePCN?.Id ?? 0;
+                    dto.HighestBinId = bestAlt.Insurance?.InsurancePCN?.Insurance?.Id?? 0;
+
+                    stockDict.TryGetValue(
+                        (bestAlt.ScriptCode, bestAlt.DrugId),
+                        out int altRemainingStock
+                    );
+
                     dto.HighestRemainingStock = altRemainingStock;
                 }
 
@@ -5223,6 +5503,27 @@ private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, i
 
             return auditDtos;
         }
+        /// <summary>
+        /// Computes what percentage of AWP the insurance reimbursed.
+        /// Returns null if AWP is not available or zero.
+        /// Useful for benchmarking PBM contracts:
+        ///   high % = strong contract, low % = weak contract.
+        /// </summary>
+        private static decimal? ComputeReimbursementRate(ScriptItem si)
+        {
+            var awp = si.AWP ?? si.Drug?.AWP ?? 0;
+
+            if (awp <= 0) return null;
+            if (si.InsurancePayment <= 0) return null;
+
+            // Insurance payment as a percentage of AWP × Quantity
+            var totalAWP = awp * si.Quantity;
+            if (totalAWP <= 0) return null;
+
+            return Math.Round((si.InsurancePayment / totalAWP) * 100m, 2);
+        }
+
+
 
         private static DateTime StartOfMonth(DateTime dt)
         {

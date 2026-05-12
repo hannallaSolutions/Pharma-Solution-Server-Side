@@ -20,7 +20,7 @@ namespace SearchTool_ServerSide.Models
         public string UserEmail { get; set; }
         public User Prescriber { get; set; }
 
-        // Script Item Details
+        // ── Script Item Details ──
         public string PF { get; set; }
         public decimal Quantity { get; set; } = 1;
         public int RemainingStock { get; set; } = 100;
@@ -28,7 +28,30 @@ namespace SearchTool_ServerSide.Models
         public decimal Discount { get; set; }
         public decimal InsurancePayment { get; set; }
         public decimal PatientPayment { get; set; }
-        public decimal NetProfit => PatientPayment + InsurancePayment - AcquisitionCost;
         public string NDCCode { get; set; }
+
+        // ── Net Profit ──
+        public decimal NetProfit => PatientPayment + InsurancePayment - AcquisitionCost;
+        public decimal? OriginalNetProfit { get; set; }
+        public decimal? NPDiscrepancy =>
+            OriginalNetProfit.HasValue ? OriginalNetProfit.Value - NetProfit : (decimal?)null;
+        public decimal? GrossProfit { get; set; }
+
+        // ── Pricing References ──
+        public decimal? AWP { get; set; }
+        public decimal? WAC { get; set; }
+        public decimal? SDRA { get; set; }
+
+        // ── Day Supply & Refill ──
+        public int? Refill { get; set; }
+        public int? DaySupply { get; set; }
+        public DateTime? DaySupplyEndDate { get; set; }
+        public DateTime? RefillDate { get; set; }
+        public string? Unit { get; set; }
+
+        // ── Status Fields ──
+        public string? Status { get; set; }
+        public string? RxStatus { get; set; }
+        public string? Priority { get; set; }
     }
 }

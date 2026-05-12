@@ -97,6 +97,7 @@ namespace SearchTool_ServerSide.Data
             );
         }
     }
+   
     public class SearchToolDBContext : DbContext
     {
         private readonly UserAccessToken _userAccessToken;
@@ -141,14 +142,15 @@ namespace SearchTool_ServerSide.Data
         public DbSet<DrugAlternativeReport> DrugAlternativeReports { get; set; }
         public DbSet<DrugDiseaseAddHistory> DrugDiseaseAddHistories { get; set; }
         public DbSet<Disease> Diseases { get; set; }
-public DbSet<DiseaseVisibilitySettings> DiseaseVisibilitySettings { get; set; }
-public DbSet<UserDiseaseVisibility> UserDiseaseVisibility { get; set; }
+        public DbSet<DiseaseVisibilitySettings> DiseaseVisibilitySettings { get; set; }
+        public DbSet<UserDiseaseVisibility> UserDiseaseVisibility { get; set; }
 
         public DbSet<Permission> Permissions { get; set; }
         public DbSet<RolePermission> RolePermissions { get; set; }
         public DbSet<Chat> Chats { get; set; }
         public DbSet<Message> Messages { get; set; }
-
+        public DbSet<Wholesaler> Wholesalers { get; set; }
+        public DbSet<DrugWholesalerPrescriber> DrugWholesalerPrescribers { get; set; }
 
         // New DbSets for Permissions
 
