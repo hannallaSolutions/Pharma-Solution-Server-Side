@@ -582,8 +582,161 @@ namespace SearchTool_ServerSide.Repository
         {
             return $"{drugId}|{wholesalerId}|{prescriberId}|{priceDate:yyyy-MM-dd}|{price}";
         }
-    }
+        public async Task<ReimbursementParametersDto?> GetReimbursementParametersAsync(
+            int userId,
+            int insuranceRxId,
+            CancellationToken ct = default)
+        {
+            var contract = await _context.UserInsuranceContracts
+                .Include(c => c.InsuranceRx)
+                .AsNoTracking()
+                .Where(c => c.UserId == userId
+                         && c.InsuranceRxId == insuranceRxId
+                         && c.IsActive
+                         && (c.EffectiveTo == null || c.EffectiveTo >= DateTime.UtcNow))
+                .OrderByDescending(c => c.EffectiveFrom)
+                .FirstOrDefaultAsync(ct);
 
+            if (contract == null) return null;
+
+            return new ReimbursementParametersDto
+            {
+                ContractId = contract.Id,
+                InsurancePlanName = contract.InsuranceRx?.RxGroup ?? string.Empty,
+                ReimbursementType = contract.ReimbursementType,
+                AwpDiscountPercent = contract.AwpDiscountPercent,
+                AspMarkupPercent = contract.AspMarkupPercent,
+                MacPrice = contract.MacPrice,
+                FixedReimbursementAmount = contract.FixedReimbursementAmount,
+                DispensingFee = contract.DispensingFee,
+                ExpectedPatientPay = contract.ExpectedPatientPay,
+                EffectiveFrom = contract.EffectiveFrom,
+                EffectiveTo = contract.EffectiveTo,
+                Notes = contract.Notes
+            };
+        }
+        public async Task<UserInsuranceContract> AddContractAsync(
+    AddUserInsuranceContractRequest request,
+    CancellationToken ct = default)
+        {
+            // Validate ReimbursementType has the required field
+            ValidateContractFields(request);
+
+            // Deactivate any existing active contract for same user + insurance
+            var existing = await _context.UserInsuranceContracts
+                .Where(c => c.UserId == request.UserId
+                         && c.InsuranceRxId == request.InsuranceRxId
+                         && c.IsActive)
+                .ToListAsync(ct);
+
+            foreach (var old in existing)
+            {
+                old.IsActive = false;
+                old.UpdatedAt = DateTime.UtcNow;
+            }
+
+            var contract = new UserInsuranceContract
+            {
+                UserId = request.UserId,
+                InsuranceRxId = request.InsuranceRxId,
+                ReimbursementType = request.ReimbursementType.ToUpperInvariant().Trim(),
+                AwpDiscountPercent = request.AwpDiscountPercent,
+                AspMarkupPercent = request.AspMarkupPercent,
+                MacPrice = request.MacPrice,
+                FixedReimbursementAmount = request.FixedReimbursementAmount,
+                DispensingFee = request.DispensingFee,
+                ExpectedPatientPay = request.ExpectedPatientPay,
+                EffectiveFrom = request.EffectiveFrom,
+                EffectiveTo = request.EffectiveTo,
+                Notes = request.Notes,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _context.UserInsuranceContracts.AddAsync(contract, ct);
+            await _context.SaveChangesAsync(ct);
+
+            return contract;
+        }
+
+        // =====================================================
+        // Validation — each type requires its own field
+        // =====================================================
+        private static void ValidateContractFields(AddUserInsuranceContractRequest r)
+        {
+            var type = r.ReimbursementType?.ToUpperInvariant().Trim();
+
+            switch (type)
+            {
+                case "AWP":
+                    if (r.AwpDiscountPercent is null)
+                        throw new ArgumentException("AWP contract requires AwpDiscountPercent.");
+                    if (r.AwpDiscountPercent is < 0 or > 100)
+                        throw new ArgumentException("AwpDiscountPercent must be between 0 and 100.");
+                    break;
+
+                case "ASP":
+                    if (r.AspMarkupPercent is null)
+                        throw new ArgumentException("ASP contract requires AspMarkupPercent.");
+                    if (r.AspMarkupPercent < 0)
+                        throw new ArgumentException("AspMarkupPercent cannot be negative.");
+                    break;
+
+                case "MAC":
+                    if (r.MacPrice is null or <= 0)
+                        throw new ArgumentException("MAC contract requires a valid MacPrice.");
+                    break;
+
+                case "FIXED":
+                    if (r.FixedReimbursementAmount is null or <= 0)
+                        throw new ArgumentException("FIXED contract requires FixedReimbursementAmount.");
+                    break;
+
+                case null or "":
+                    throw new ArgumentException("ReimbursementType is required.");
+
+                default:
+                    throw new ArgumentException(
+                        $"Invalid ReimbursementType '{r.ReimbursementType}'. " +
+                        "Allowed values: AWP, ASP, MAC, FIXED.");
+            }
+
+            if (r.EffectiveFrom.HasValue && r.EffectiveTo.HasValue
+                && r.EffectiveTo <= r.EffectiveFrom)
+                throw new ArgumentException("EffectiveTo must be after EffectiveFrom.");
+        }
+
+
+        // =====================================================
+        // Internal lookup object
+        // =====================================================
+        internal class ImportLookupData
+        {
+            public Dictionary<string, Drug> DrugByNdc { get; set; } = new();
+            public Dictionary<string, Wholesaler> WholesalerByName { get; set; } = new();
+            public HashSet<string> ExistingKeys { get; set; } = new();
+        }
+        
+    }
+    public class ReimbursementParametersDto
+    {
+        public int ContractId { get; set; }
+        public string InsurancePlanName { get; set; } = string.Empty;
+        public string ReimbursementType { get; set; } = string.Empty;
+
+        // Only one of these will be populated depending on ReimbursementType
+        public decimal? AwpDiscountPercent { get; set; }
+        public decimal? AspMarkupPercent { get; set; }
+        public decimal? MacPrice { get; set; }
+        public decimal? FixedReimbursementAmount { get; set; }
+
+        public decimal? DispensingFee { get; set; }
+        public decimal? ExpectedPatientPay { get; set; }
+
+        public DateTime? EffectiveFrom { get; set; }
+        public DateTime? EffectiveTo { get; set; }
+        public string? Notes { get; set; }
+    }
     // =====================================================
     // DTO: File row structure for CSV and Excel
     // =====================================================
@@ -624,14 +777,28 @@ namespace SearchTool_ServerSide.Repository
 
         public List<string> Errors { get; set; } = new();
     }
-
     // =====================================================
-    // Internal lookup object
+    // Request DTO
     // =====================================================
-    internal class ImportLookupData
+    public class AddUserInsuranceContractRequest
     {
-        public Dictionary<string, Drug> DrugByNdc { get; set; } = new();
-        public Dictionary<string, Wholesaler> WholesalerByName { get; set; } = new();
-        public HashSet<string> ExistingKeys { get; set; } = new();
+        public int UserId { get; set; }
+        public int InsuranceRxId { get; set; }
+
+        // AWP / ASP / MAC / FIXED
+        public string ReimbursementType { get; set; } = string.Empty;
+
+        public decimal? AwpDiscountPercent { get; set; }
+        public decimal? AspMarkupPercent { get; set; }
+        public decimal? MacPrice { get; set; }
+        public decimal? FixedReimbursementAmount { get; set; }
+
+        public decimal? DispensingFee { get; set; }
+        public decimal? ExpectedPatientPay { get; set; }
+
+        public DateTime? EffectiveFrom { get; set; }
+        public DateTime? EffectiveTo { get; set; }
+
+        public string? Notes { get; set; }
     }
 }

@@ -151,7 +151,7 @@ namespace SearchTool_ServerSide.Data
         public DbSet<Message> Messages { get; set; }
         public DbSet<Wholesaler> Wholesalers { get; set; }
         public DbSet<DrugWholesalerPrescriber> DrugWholesalerPrescribers { get; set; }
-
+        public DbSet<UserInsuranceContract> UserInsuranceContracts { get; set; }
         // New DbSets for Permissions
 
 

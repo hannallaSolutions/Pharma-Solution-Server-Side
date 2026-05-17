@@ -3,7 +3,7 @@ using SearchTool_ServerSide.Repository;
 
 namespace SearchTool_ServerSide.Services
 {
-    public class DrugWholesalerPrescriberService 
+    public class DrugWholesalerPrescriberService
     {
         private readonly DrugWholesalerPrescriberRepository _repository;
 
@@ -12,7 +12,18 @@ namespace SearchTool_ServerSide.Services
         {
             _repository = repository;
         }
-
+        public async Task<UserInsuranceContract> AddContractAsync(AddUserInsuranceContractRequest request)
+        {
+            try
+            {
+                var contract = await _repository.AddContractAsync(request);
+                return contract;
+            }
+            catch (ArgumentException ex)
+            {
+                throw new ArgumentException("error at wholesaler", ex);    
+            }
+        }
         public async Task<WholesalerImportResultDto> ImportPricesFileAsync(
             IFormFile file,
             int defaultPrescriberId,
@@ -112,6 +123,15 @@ namespace SearchTool_ServerSide.Services
                 drugId,
                 prescriberId,
                 ct);
+        }
+
+        public async Task<ReimbursementParametersDto?> GetReimbursementParametersAsync(
+            int userId,
+            int insuranceRxId,
+            CancellationToken ct = default)
+        {
+            var result = await _repository.GetReimbursementParametersAsync(userId, insuranceRxId);
+            return result;
         }
     }
 }

@@ -3229,7 +3229,7 @@ namespace SearchTool_ServerSide.Repository
             foreach (var record in processedRecords)
             {
 
-                if (!branchDict.TryGetValue(record.Branch, out var branch))
+                if (!branchDict.TryGetValue(record.Branch.Trim(), out var branch))
                 {
                     var tempBranch = _context.Branches.FirstOrDefault(x => x.Code == record.Branch);
                     Console.WriteLine("here : " + record.Branch);

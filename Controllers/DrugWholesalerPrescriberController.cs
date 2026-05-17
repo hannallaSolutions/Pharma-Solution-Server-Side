@@ -1,15 +1,44 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using SearchTool_ServerSide.Authentication;
 using SearchTool_ServerSide.Dtos.DrugWholesalerPrescriberDtos;
+using SearchTool_ServerSide.Repository;
 using SearchTool_ServerSide.Services;
 
 namespace SearchTool_ServerSide.Controllers
 {
     [Route("[controller]")]
     [ApiController]
-    public class DrugWholesalerPrescriberController(DrugWholesalerPrescriberService _service) : ControllerBase
+    public class DrugWholesalerPrescriberController(DrugWholesalerPrescriberService _service,UserAccessToken userAccessToken) : ControllerBase
     {
+        [HttpPost("contracts")]
+        public async Task<IActionResult> AddContract(
+        [FromBody] AddUserInsuranceContractRequest request)
+        {
+            try
+            {
+                var contract = await _service.AddContractAsync(request);
+                return Ok(contract);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+        [HttpGet("reimbursement-parameters")]
+        public async Task<IActionResult> GetReimbursementParameters([FromQuery]int insuranceRxId)
+        {
+            var tokenData = userAccessToken.tokenData();
+            if (tokenData == null || tokenData.UserId == null)
+            {
+                return BadRequest("Invalide Data");
+            }
+            var result = await _service.GetReimbursementParametersAsync(int.Parse(tokenData.UserId), insuranceRxId);
 
+            if (result == null)
+                return NotFound("No active contract found for this user and insurance plan.");
 
+            return Ok(result);
+        }
         // =====================================================
         // Upload Excel or CSV file
         // POST: api/DrugWholesalerPrescriber/import
