@@ -19,7 +19,7 @@ jobs:
           timeout: 300s
           script: |
             set -e
-            cd home/ec2-user/src/SearchTool_build || exit
+            cd /home/ec2-user/src/SearchTool_build || exit
             git remote set-url origin https://github.com/Mohamed2670/Pharma-Solution-Server-Side.git
             git fetch --all
             git reset --hard origin/dev
