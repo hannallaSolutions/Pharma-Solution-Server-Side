@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SearchTool_ServerSide.Data;
@@ -11,9 +12,11 @@ using SearchTool_ServerSide.Data;
 namespace SearchTool_ServerSide.Migrations
 {
     [DbContext(typeof(SearchToolDBContext))]
-    partial class SearchToolDBContextModelSnapshot : ModelSnapshot
+    [Migration("20260517185507_AddUniqueIndexForDrugWholesalerPrescriber")]
+    partial class AddUniqueIndexForDrugWholesalerPrescriber
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -343,7 +346,7 @@ namespace SearchTool_ServerSide.Migrations
                         {
                             Id = 1,
                             Mode = 1,
-                            UpdatedAt = new DateTime(2026, 5, 18, 19, 4, 43, 508, DateTimeKind.Utc).AddTicks(3523)
+                            UpdatedAt = new DateTime(2026, 5, 17, 18, 54, 20, 238, DateTimeKind.Utc).AddTicks(5731)
                         });
                 });
 
@@ -1588,69 +1591,6 @@ namespace SearchTool_ServerSide.Migrations
                     b.ToTable("UserDiseaseVisibility");
                 });
 
-            modelBuilder.Entity("SearchTool_ServerSide.Models.UserInsuranceContract", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<decimal?>("AspMarkupPercent")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal?>("AwpDiscountPercent")
-                        .HasColumnType("numeric");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal?>("DispensingFee")
-                        .HasColumnType("numeric");
-
-                    b.Property<DateTime?>("EffectiveFrom")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("EffectiveTo")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal?>("ExpectedPatientPay")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal?>("FixedReimbursementAmount")
-                        .HasColumnType("numeric");
-
-                    b.Property<int>("InsuranceRxId")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<decimal?>("MacPrice")
-                        .HasColumnType("numeric");
-
-                    b.Property<string>("Notes")
-                        .HasColumnType("text");
-
-                    b.Property<string>("ReimbursementType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("InsuranceRxId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("UserInsuranceContracts");
-                });
-
             modelBuilder.Entity("SearchTool_ServerSide.Models.Wholesaler", b =>
                 {
                     b.Property<int>("Id")
@@ -2265,25 +2205,6 @@ namespace SearchTool_ServerSide.Migrations
                         .IsRequired();
 
                     b.Navigation("Disease");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("SearchTool_ServerSide.Models.UserInsuranceContract", b =>
-                {
-                    b.HasOne("SearchTool_ServerSide.Models.InsuranceRx", "InsuranceRx")
-                        .WithMany()
-                        .HasForeignKey("InsuranceRxId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SearchTool_ServerSide.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("InsuranceRx");
 
                     b.Navigation("User");
                 });

@@ -5,6 +5,7 @@ using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.EntityFrameworkCore;
 using SearchTool_ServerSide.Data;
+using SearchTool_ServerSide.Dtos.DrugWholesalerPrescriberDtos;
 using SearchTool_ServerSide.Models;
 
 namespace SearchTool_ServerSide.Repository
@@ -346,7 +347,12 @@ namespace SearchTool_ServerSide.Repository
                 return;
             }
 
-            var priceDate = ParseDate(record.PriceDate) ?? DateTime.UtcNow.Date;
+           // var priceDate = ParseDate(record.PriceDate) ?? DateTime.UtcNow.Date;
+           
+var parsedPriceDate = ParseDate(record.PriceDate);
+var priceDate = parsedPriceDate.HasValue
+    ? DateTime.SpecifyKind(parsedPriceDate.Value.Date, DateTimeKind.Utc)
+    : DateTime.UtcNow.Date;
 
             var awp = ParseDecimal(record.AWP);
             var wac = ParseDecimal(record.WAC);
@@ -582,6 +588,45 @@ namespace SearchTool_ServerSide.Repository
         {
             return $"{drugId}|{wholesalerId}|{prescriberId}|{priceDate:yyyy-MM-dd}|{price}";
         }
+    
+
+
+//new code to show all data
+public async Task<List<DrugWholesalerPrescriber>> GetAllPricesForPrescriberAsync(
+    int prescriberId,
+    CancellationToken ct = default)
+{
+    return await _context.DrugWholesalerPrescribers
+        .AsNoTracking()
+        .Include(x => x.Drug)
+        .Include(x => x.Wholesaler)
+        .Include(x => x.Prescriber)
+        .Where(x => x.PrescriberId == prescriberId && x.IsActive)
+        .OrderByDescending(x => x.PriceDate)
+        .ThenBy(x => x.Drug.Name)
+        .ThenBy(x => x.Wholesaler.Name)
+        .ToListAsync(ct);
+}
+
+
+
+// get all perscripers names , this means doctor users
+public async Task<List<PrescriberOptionDto>> GetAllPrescribersAsync(
+    CancellationToken ct = default)
+{
+    return await _context.Users
+        .AsNoTracking()
+        .Where(u => u.Role == Role.Doctor)
+        .OrderBy(u => u.Name)
+        .Select(u => new PrescriberOptionDto
+        {
+            Id = u.Id,
+            Name = u.Name
+        })
+        .ToListAsync(ct);
+}
+
+
         public async Task<ReimbursementParametersDto?> GetReimbursementParametersAsync(
             int userId,
             int insuranceRxId,

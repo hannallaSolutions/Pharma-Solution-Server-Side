@@ -1,4 +1,5 @@
-﻿using SearchTool_ServerSide.Models;
+﻿using SearchTool_ServerSide.Dtos.DrugWholesalerPrescriberDtos;
+using SearchTool_ServerSide.Models;
 using SearchTool_ServerSide.Repository;
 
 namespace SearchTool_ServerSide.Services
@@ -124,6 +125,33 @@ namespace SearchTool_ServerSide.Services
                 prescriberId,
                 ct);
         }
+    
+
+    public async Task<List<DrugWholesalerPrescriber>> GetAllPricesForPrescriberAsync(
+    int prescriberId,
+    CancellationToken ct = default)
+{
+    if (prescriberId <= 0)
+        throw new ArgumentException("Prescriber ID is required.");
+
+    return await _repository.GetAllPricesForPrescriberAsync(prescriberId, ct);
+}
+
+
+//get all prescribers for dropdown
+    public async Task<List<PrescriberOptionDto>> GetAllPrescribersAsync(
+        CancellationToken ct = default)
+        {
+            return await _repository.GetAllPrescribersAsync(ct);
+            
+            
+    }
+
+        internal async Task GetPrescriberOptionsAsync(CancellationToken ct)
+        {
+            throw new NotImplementedException();
+
+        }
 
         public async Task<ReimbursementParametersDto?> GetReimbursementParametersAsync(
             int userId,
@@ -131,7 +159,9 @@ namespace SearchTool_ServerSide.Services
             CancellationToken ct = default)
         {
             var result = await _repository.GetReimbursementParametersAsync(userId, insuranceRxId);
+
             return result;
         }
     }
+
 }

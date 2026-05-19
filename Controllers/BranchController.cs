@@ -1,8 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using SearchTool_ServerSide.Authentication;
-using SearchTool_ServerSide.Data;
 using SearchTool_ServerSide.Dtos.BranchDTOs;
 using SearchTool_ServerSide.Services;
 
@@ -14,13 +12,13 @@ namespace SearchTool_ServerSide.Controllers
     {
         private readonly BranchService _branchService;
         private readonly UserAccessToken _userAccessToken;
-        private readonly SearchToolDBContext _context;
 
-        public BranchController(BranchService branchService, UserAccessToken userAccessToken, SearchToolDBContext context)
+        public BranchController(
+            BranchService branchService,
+            UserAccessToken userAccessToken)
         {
             _branchService = branchService;
             _userAccessToken = userAccessToken;
-            _context = context;
         }
 
         [HttpGet("GetMainCompanyByBranchId")]
@@ -44,18 +42,29 @@ namespace SearchTool_ServerSide.Controllers
             var branches = await _branchService.GetAllBranches();
             return Ok(branches);
         }
+        
         //        GetAllMainCompanyBranchesByBranchId
+
         [HttpGet("GetAllMainCompanyBranchesByBranchId")]
         public async Task<IActionResult> GetAllMainCompanyBranchesByBranchId()
         {
             var tokenData = _userAccessToken.tokenData();
-            if(tokenData==null || tokenData.BranchId == null)
+
+            if (tokenData == null || string.IsNullOrWhiteSpace(tokenData.BranchId))
             {
                 return NotFound("Invalid Data");
             }
             var branches = await _branchService.GetAllMainCompanyBranchesByBranchId(int.Parse(tokenData.BranchId));
+
+            if (!int.TryParse(tokenData.BranchId, out var branchId))
+            {
+                return BadRequest("Invalid BranchId");
+            }
+
+            _ = await _branchService.GetAllMainCompanyBranchesByBranchId(branchId);
             return Ok(branches);
         }
+
         [HttpPost("CreateBranch")]
         public async Task<IActionResult> CreateBranch([FromBody] CreateBranchDto branch)
         {
@@ -73,27 +82,17 @@ namespace SearchTool_ServerSide.Controllers
         [HttpGet("GetBranchesWithUsersCount")]
         public async Task<IActionResult> GetBranchesWithUsersCount()
         {
-            var data = await _context.Branches
-                .Select(b => new
-                {
-                    branchId = b.Id,
-                    branchName = b.Name,
-                    usersCount = _context.Users.Count(u => u.BranchId == b.Id)
-                     // get users where user in branch row = user in matching row in users table
-                })
-                .ToListAsync();
-
+            var data = await _branchService.GetBranchesWithUsersCount();
             return Ok(data);
         }
 
-        //edit row
-        [HttpPut("edit")]
-
-        public async Task<IActionResult> EditBranch([FromQuery] int branchId, [FromBody] EditBranchDto branch)
+        [HttpPut("EditBranch")]
+        public async Task<IActionResult> EditBranch(
+            [FromQuery] int branchId,
+            [FromBody] EditBranchDto branch)
         {
             var result = await _branchService.EditBranch(branchId, branch);
             return result ? NoContent() : NotFound();
+        }
     }
-    
-}
 }

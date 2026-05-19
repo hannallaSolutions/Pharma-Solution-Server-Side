@@ -92,7 +92,7 @@ builder.Services.AddScoped<DiseaseService>();
 builder.Services.AddScoped<DrugWholesalerPrescriberService>();
 
 builder.Services.AddScoped<IChatOrchestratorService, ChatOrchestratorService>();
-
+builder.Services.AddScoped<CompanyFeatureSettingService>();
 //for email campaign
 builder.Services.AddScoped<EmailCampaignService>();
 builder.Services.AddScoped<RecipientFileParserService>();
@@ -134,7 +134,7 @@ var allowedOrigins = new List<string>
         "http://127.0.0.1:8000",
 
 };
-
+/*
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("CorsPolicy", policy =>
@@ -145,9 +145,21 @@ builder.Services.AddCors(options =>
               .AllowAnyMethod();
     });
 });
+*/
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy
+            .WithOrigins("http://localhost:5173")
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
 
-
-
+// Add this before builder.Build()
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -155,6 +167,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+//app.UseHttpsRedirection();
+app.UseCors("AllowFrontend");
 
 app.UseHttpsRedirection();
 app.UseCors("CorsPolicy");

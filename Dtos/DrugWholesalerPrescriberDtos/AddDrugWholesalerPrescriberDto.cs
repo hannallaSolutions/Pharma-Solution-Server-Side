@@ -21,4 +21,11 @@
         public string? SourceFileName { get; set; }
         public string? SourcePath { get; set; }
     }
+
+
+    public class PrescriberOptionDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+}
 }

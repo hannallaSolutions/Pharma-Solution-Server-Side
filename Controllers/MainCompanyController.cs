@@ -27,14 +27,15 @@ namespace SearchTool_ServerSide.Controllers
             _context = context;
         }
 
-        [HttpGet("GetAllMainCompanies")]
-     //   [HasPermission("GetAllMainCompanies")]
-        public async Task<IActionResult> GetAllMainCompaniesAsync()
-        {
-            var companies = await _mainCompanyService.GetAllMainCompaniesAsync();
-            return Ok(companies);
-        }
+        
 
+[HttpGet("GetAllMainCompanies")]
+public async Task<IActionResult> GetAllMainCompanies()
+{
+    var companies = await _mainCompanyService.GetAllMainCompaniesAsync();
+
+    return Ok(companies);
+}
         [HttpGet("GetMainCompanyById/{id}")]
         public async Task<IActionResult> GetMainCompanyByIdAsync(int id)
         {
@@ -73,6 +74,56 @@ namespace SearchTool_ServerSide.Controllers
             .ToListAsync();
             return Ok(data);
         }
+
+
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> EditMainCompany(int id, [FromBody] EditMainCompanyDto dto)
+        {
+            if (dto == null)
+            {
+                return BadRequest("Invalid data.");
+            }
+
+            if (string.IsNullOrWhiteSpace(dto.Name))
+            {
+                return BadRequest("Company name is required.");
+            }
+
+            var result = await _mainCompanyService.EditMainCompanyAsync(id, dto);
+
+            if (!result)
+            {
+                return NotFound($"Main company with id {id} was not found.");
+            }
+
+            return Ok(new
+            {
+                message = "Main company updated successfully."
+            });
+        }
+    
+
+    [HttpDelete("DeleteMainCompany/{id}")]
+public async Task<IActionResult> DeleteMainCompany(int id)
+{
+    var result = await _mainCompanyService.DeleteMainCompanyAsync(id);
+
+    if (!result)
+    {
+        return NotFound(new
+        {
+            success = false,
+            message = "Main company not found"
+        });
+    }
+
+    return Ok(new
+    {
+        success = true,
+        message = "Main company deleted successfully"
+    });
+}
     }
     
 }

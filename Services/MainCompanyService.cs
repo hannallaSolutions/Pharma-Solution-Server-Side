@@ -7,11 +7,17 @@ namespace SearchTool_ServerSide.Services
 {
     public class MainCompanyService(MainCompanyRepository _mainCompanyService, IMapper _mapper)
     {
+        /*
         public async Task<IEnumerable<MainCompanyReadDto>> GetAllMainCompaniesAsync()
         {
             var companies = await _mainCompanyService.GetAllMainCompaniesAsync();
             return _mapper.Map<IEnumerable<MainCompanyReadDto>>(companies);
         }
+*/
+        internal async Task<IEnumerable<object>> GetAllMainCompaniesAsync()
+{
+    return await _mainCompanyService.GetAllMainCompaniesAsync();
+}
         public async Task<MainCompanyReadDto?> GetMainCompanyByIdAsync(int id)
         {
             var company = await _mainCompanyService.GetMainCompanyByIdAsync(id);
@@ -34,6 +40,27 @@ namespace SearchTool_ServerSide.Services
         }
 
         //edit main company
+    
+
+
+         
+        public async Task<bool> EditMainCompanyAsync(int id, EditMainCompanyDto dto)
+        {
+            var updatedCompany = new MainCompany
+            {
+                Id = id,
+                Name = dto.Name,
+                SpecialtyId = dto.SpecialtyId,
+                ClassTypeId = dto.ClassTypeId
+            };
+
+            return await _mainCompanyService.EditMainCompanyAsync(id, updatedCompany);
+        }
+    
+public async Task<bool> DeleteMainCompanyAsync(int id)
+{
+    return await _mainCompanyService.DeleteMainCompanyAsync(id);
+}
             
     }
 }
