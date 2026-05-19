@@ -9,7 +9,7 @@ namespace SearchTool_ServerSide.Controllers
 {
     [Route("[controller]")]
     [ApiController]
-    public class DrugWholesalerPrescriberController(DrugWholesalerPrescriberService _service,UserAccessToken userAccessToken) : ControllerBase
+    public class DrugWholesalerPrescriberController(DrugWholesalerPrescriberService _service, UserAccessToken userAccessToken) : ControllerBase
     {
         /*
         [HttpPost("contracts")]
@@ -28,32 +28,32 @@ namespace SearchTool_ServerSide.Controllers
         }
 */
 
-[HttpPost("contracts")]
-public async Task<IActionResult> AddContract(
-    [FromBody] AddUserInsuranceContractRequest request)
-{
-    try
-    {
-        var userId =
-            User.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
-            User.FindFirst("nameid")?.Value;
+        [HttpPost("contracts")]
+        public async Task<IActionResult> AddContract(
+            [FromBody] AddUserInsuranceContractRequest request)
+        {
+            try
+            {
+                var userId =
+                    User.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
+                    User.FindFirst("nameid")?.Value;
 
-        if (string.IsNullOrWhiteSpace(userId))
-            return BadRequest("Invalid user data.");
+                if (string.IsNullOrWhiteSpace(userId))
+                    return BadRequest("Invalid user data.");
 
-        request.UserId = int.Parse(userId);
+                request.UserId = int.Parse(userId);
 
-        var contract = await _service.AddContractAsync(request);
-        return Ok(contract);
-    }
-    catch (ArgumentException ex)
-    {
-        return BadRequest(ex.Message);
-    }
-}
+                var contract = await _service.AddContractAsync(request);
+                return Ok(contract);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
 
         [HttpGet("reimbursement-parameters")]
-        public async Task<IActionResult> GetReimbursementParameters([FromQuery]int insuranceRxId)
+        public async Task<IActionResult> GetReimbursementParameters([FromQuery] int insuranceRxId)
         {
             var tokenData = userAccessToken.tokenData();
             if (tokenData == null || tokenData.UserId == null)
@@ -97,18 +97,18 @@ public async Task<IActionResult> AddContract(
                     message = ex.Message
                 });
             }
-        
-            
+
+
             catch (Exception ex)
-{
-    return StatusCode(500, new
-    {
-        message = "An error occurred while importing wholesaler prices.",
-        error = ex.Message,
-        innerError = ex.InnerException?.Message,
-        fullError = ex.ToString()
-    });
-}
+            {
+                return StatusCode(500, new
+                {
+                    message = "An error occurred while importing wholesaler prices.",
+                    error = ex.Message,
+                    innerError = ex.InnerException?.Message,
+                    fullError = ex.ToString()
+                });
+            }
         }
 
         // =====================================================
@@ -251,73 +251,73 @@ public async Task<IActionResult> AddContract(
         }
 
 
-//to get all data for a prescriber
+        //to get all data for a prescriber
         [HttpGet("by-prescriber")]
-public async Task<IActionResult> GetAllPricesForPrescriber(
-    [FromQuery] int prescriberId,
-    CancellationToken ct)
-{
-    try
-    {
-        var result = await _service.GetAllPricesForPrescriberAsync(
-            prescriberId,
-            ct);
-
-        return Ok(new
+        public async Task<IActionResult> GetAllPricesForPrescriber(
+        [FromQuery] int prescriberId,
+        CancellationToken ct)
         {
-            message = "Wholesaler prices loaded successfully.",
-            data = result.Select(x => new
+            try
             {
-                id = x.Id,
-                drugId = x.DrugId,
-                drugName = x.Drug != null ? x.Drug.Name : null,
-                ndc = x.Drug != null ? x.Drug.NDC : null,
+                var result = await _service.GetAllPricesForPrescriberAsync(
+                    prescriberId,
+                    ct);
 
-                wholesalerId = x.WholesalerId,
-                wholesalerName = x.Wholesaler != null ? x.Wholesaler.Name : null,
+                return Ok(new
+                {
+                    message = "Wholesaler prices loaded successfully.",
+                    data = result.Select(x => new
+                    {
+                        id = x.Id,
+                        drugId = x.DrugId,
+                        drugName = x.Drug != null ? x.Drug.Name : null,
+                        ndc = x.Drug != null ? x.Drug.NDC : null,
 
-                prescriberId = x.PrescriberId,
-                prescriberName = x.Prescriber != null ? x.Prescriber.Name : null,
+                        wholesalerId = x.WholesalerId,
+                        wholesalerName = x.Wholesaler != null ? x.Wholesaler.Name : null,
 
-                price = x.Price,
-                priceDate = x.PriceDate,
+                        prescriberId = x.PrescriberId,
+                        prescriberName = x.Prescriber != null ? x.Prescriber.Name : null,
 
-                awp = x.AWP,
-                wac = x.WAC,
-                asp = x.ASP,
-                mac = x.MAC,
+                        price = x.Price,
+                        priceDate = x.PriceDate,
 
-                billingUnit = x.BillingUnit,
-                drugClass = x.DrugClass,
-                quarterYear = x.QuarterYear,
+                        awp = x.AWP,
+                        wac = x.WAC,
+                        asp = x.ASP,
+                        mac = x.MAC,
 
-                sourceFileName = x.SourceFileName,
-                sourcePath = x.SourcePath,
+                        billingUnit = x.BillingUnit,
+                        drugClass = x.DrugClass,
+                        quarterYear = x.QuarterYear,
 
-                createdAt = x.CreatedAt
-            })
-        });
-    }
-    catch (ArgumentException ex)
-    {
-        return BadRequest(new
-        {
-            message = ex.Message
-        });
-    }
-    catch (Exception ex)
-    {
-        return StatusCode(500, new
-        {
-            message = "An error occurred while loading wholesaler prices.",
-            error = ex.Message,
-            innerError = ex.InnerException?.Message
-        });
-    }
-}
+                        sourceFileName = x.SourceFileName,
+                        sourcePath = x.SourcePath,
+
+                        createdAt = x.CreatedAt
+                    })
+                });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new
+                {
+                    message = ex.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "An error occurred while loading wholesaler prices.",
+                    error = ex.Message,
+                    innerError = ex.InnerException?.Message
+                });
+            }
+        }
 
 
-//get prescriber options for dropdown
+        //get prescriber options for dropdown
         [HttpGet("prescriber-options")]
         public async Task<IActionResult> GetPrescriberOptions(CancellationToken ct)
         {
@@ -340,55 +340,66 @@ public async Task<IActionResult> GetAllPricesForPrescriber(
                     innerError = ex.InnerException?.Message
                 });
             }
-    }
+        }
 
 
-    [HttpGet("my-prices")]
-public async Task<IActionResult> GetMyWholesalerPrices(CancellationToken ct)
-{
-    var tokenData = userAccessToken.tokenData();
-
-    if (tokenData == null || tokenData.UserId == null)
-        return BadRequest("Invalid user data.");
-
-    var userId = int.Parse(tokenData.UserId);
-
-    var result = await _service.GetAllPricesForPrescriberAsync(userId, ct);
-
-    return Ok(new
-    {
-        message = "My wholesaler prices loaded successfully.",
-        data = result.Select(x => new
+        [HttpGet("my-prices")]
+        public async Task<IActionResult> GetMyWholesalerPrices(CancellationToken ct)
         {
-            id = x.Id,
-            drugId = x.DrugId,
-            drugName = x.Drug != null ? x.Drug.Name : null,
-            ndc = x.Drug != null ? x.Drug.NDC : null,
+            var tokenData = userAccessToken.tokenData();
 
-            wholesalerId = x.WholesalerId,
-            wholesalerName = x.Wholesaler != null ? x.Wholesaler.Name : null,
+            if (tokenData == null || tokenData.UserId == null)
+                return BadRequest("Invalid user data.");
 
-            prescriberId = x.PrescriberId,
-            prescriberName = x.Prescriber != null ? x.Prescriber.Name : null,
+            var userId = int.Parse(tokenData.UserId);
 
-            price = x.Price,
-            priceDate = x.PriceDate,
+            var result = await _service.GetAllPricesForPrescriberAsync(userId, ct);
 
-            awp = x.AWP,
-            wac = x.WAC,
-            asp = x.ASP,
-            mac = x.MAC,
+            return Ok(new
+            {
+                message = "My wholesaler prices loaded successfully.",
+                data = result.Select(x => new
+                {
+                    id = x.Id,
+                    drugId = x.DrugId,
+                    drugName = x.Drug != null ? x.Drug.Name : null,
+                    ndc = x.Drug != null ? x.Drug.NDC : null,
 
-            billingUnit = x.BillingUnit,
-            drugClass = x.DrugClass,
-            quarterYear = x.QuarterYear,
+                    wholesalerId = x.WholesalerId,
+                    wholesalerName = x.Wholesaler != null ? x.Wholesaler.Name : null,
 
-            sourceFileName = x.SourceFileName,
-            sourcePath = x.SourcePath,
+                    prescriberId = x.PrescriberId,
+                    prescriberName = x.Prescriber != null ? x.Prescriber.Name : null,
 
-            createdAt = x.CreatedAt
-        })
-    });
+                    price = x.Price,
+                    priceDate = x.PriceDate,
+
+                    awp = x.AWP,
+                    wac = x.WAC,
+                    asp = x.ASP,
+                    mac = x.MAC,
+
+                    billingUnit = x.BillingUnit,
+                    drugClass = x.DrugClass,
+                    quarterYear = x.QuarterYear,
+
+                    sourceFileName = x.SourceFileName,
+                    sourcePath = x.SourcePath,
+
+                    createdAt = x.CreatedAt
+                })
+            });
+        }
+        [HttpGet("GetDrugPriceWithInsuranceAsync")]
+        public async Task<IActionResult> GetDrugPriceWithInsuranceAsync([FromQuery] int drugId, [FromQuery] int insureanceRxId)
+        {
+            var tokenData = userAccessToken.tokenData();
+            if (tokenData == null || tokenData.BranchId == null)
+            {
+                return BadRequest("Invalide Data");
+            }
+            var result = await _service.GetDrugPriceWithInsuranceAsync(drugId, int.Parse(tokenData.BranchId), insureanceRxId);
+            return Ok(result);
+        }
+    }
 }
-    
-    }}

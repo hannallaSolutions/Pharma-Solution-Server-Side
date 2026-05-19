@@ -1,12 +1,13 @@
-﻿using System.Globalization;
-using System.Text;
-using ClosedXML.Excel;
+﻿using ClosedXML.Excel;
 using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.EntityFrameworkCore;
 using SearchTool_ServerSide.Data;
+using SearchTool_ServerSide.Dtos;
 using SearchTool_ServerSide.Dtos.DrugWholesalerPrescriberDtos;
 using SearchTool_ServerSide.Models;
+using System.Globalization;
+using System.Text;
 
 namespace SearchTool_ServerSide.Repository
 {
@@ -588,11 +589,183 @@ var priceDate = parsedPriceDate.HasValue
         {
             return $"{drugId}|{wholesalerId}|{prescriberId}|{priceDate:yyyy-MM-dd}|{price}";
         }
-    
 
+        public async Task<DrugPriceWithInsuranceDto?> GetDrugPriceWithInsuranceAsync(
+    int drugId,
+    int branchId,
+    int insuranceRxId,
+    CancellationToken ct = default)
+        {
+            // ── 1. Load drug ──────────────────────────────────────────────────────────
+            var drug = await _context.Drugs
+                .AsNoTracking()
+                .FirstOrDefaultAsync(d => d.Id == drugId, ct);
 
-//new code to show all data
-public async Task<List<DrugWholesalerPrescriber>> GetAllPricesForPrescriberAsync(
+            if (drug == null) return null;
+
+            // ── 2. Load insurance plan name ───────────────────────────────────────────
+            var insuranceRx = await _context.InsuranceRxes
+                .AsNoTracking()
+                .FirstOrDefaultAsync(rx => rx.Id == insuranceRxId, ct);
+
+            // ── 3. Load all active pricing rows for this drug + branch ───────────────
+            //    Each prescriber in the branch can have prices from different wholesalers
+            //    We take the most recent row per (prescriber, wholesaler) combination
+            var allPricingRows = await _context.DrugWholesalerPrescribers
+                .Include(p => p.Wholesaler)
+                .Include(p => p.Prescriber)
+                .AsNoTracking()
+                .Where(p => p.DrugId == drugId
+                         && p.IsActive
+                         && p.Prescriber.BranchId == branchId)
+                .ToListAsync(ct);
+
+            if (!allPricingRows.Any())
+                return new DrugPriceWithInsuranceDto
+                {
+                    DrugId = drug.Id,
+                    DrugName = drug.Name,
+                    NDC = drug.NDC,
+                    Form = drug.Form,
+                    Strength = drug.Strength,
+                    InsurancePlanName = insuranceRx?.RxGroup ?? string.Empty,
+                    NoContractFound = true
+                };
+
+            // Latest row per (PrescriberId, WholesalerId)
+            var latestPerPrescriberWholesaler = allPricingRows
+                .GroupBy(p => new { p.PrescriberId, p.WholesalerId })
+                .Select(g => g.OrderByDescending(p => p.PriceDate)
+                              .ThenByDescending(p => p.CreatedAt)
+                              .First())
+                .ToList();
+
+            // ── 4. Load contracts for all prescribers in this branch ─────────────────
+            //    One contract per (prescriber, insurance) — take most recent active
+            var prescriberIds = latestPerPrescriberWholesaler
+                .Select(p => p.PrescriberId)
+                .Distinct()
+                .ToList();
+
+            var contractsMap = (await _context.UserInsuranceContracts
+                .AsNoTracking()
+                .Where(c => c.InsuranceRxId == insuranceRxId
+                         && c.IsActive
+                         && prescriberIds.Contains(c.UserId)
+                         && (c.EffectiveTo == null || c.EffectiveTo >= DateTime.UtcNow))
+                .ToListAsync(ct))
+                .GroupBy(c => c.UserId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.OrderByDescending(c => c.EffectiveFrom).First());
+
+            // ── 5. Build result rows ──────────────────────────────────────────────────
+            var breakdowns = new List<WholesalerPriceBreakdownDto>();
+
+            foreach (var pricing in latestPerPrescriberWholesaler)
+            {
+                var row = new WholesalerPriceBreakdownDto
+                {
+                    WholesalerId = pricing.WholesalerId,
+                    WholesalerName = pricing.Wholesaler?.Name ?? string.Empty,
+                    PrescriberId = pricing.PrescriberId,
+                    PrescriberName = pricing.Prescriber?.Name ?? string.Empty,
+                    ACQ = pricing.Price,
+                    AWP = pricing.AWP,
+                    WAC = pricing.WAC,
+                    ASP = pricing.ASP,
+                    MAC = pricing.MAC,
+                    BillingUnit = pricing.BillingUnit,
+                    QuarterYear = pricing.QuarterYear,
+                    PriceDate = pricing.PriceDate,
+                };
+
+                // No contract for this prescriber → skip calculation
+                if (!contractsMap.TryGetValue(pricing.PrescriberId, out var contract))
+                {
+                    row.MissingSnapshot = true;
+                    breakdowns.Add(row);
+                    continue;
+                }
+
+                decimal fee = contract.DispensingFee ?? 0m;
+
+                try
+                {
+                    row.InsurancePayment = contract.ReimbursementType.ToUpperInvariant() switch
+                    {
+                        "AWP" when pricing.AWP > 0 =>
+                            pricing.AWP!.Value * (1m - (contract.AwpDiscountPercent ?? 0m) / 100m) + fee,
+
+                        "ASP" when pricing.ASP > 0 =>
+                            pricing.ASP!.Value * (1m + (contract.AspMarkupPercent ?? 0m) / 100m) + fee,
+
+                        "MAC" =>
+                            (contract.MacPrice ?? pricing.MAC ?? 0m) + fee,
+
+                        "FIXED" =>
+                            contract.FixedReimbursementAmount ?? 0m,
+
+                        // Contract type exists but the required snapshot field is null
+                        _ => throw new InvalidOperationException("missing_snapshot")
+                    };
+
+                    row.PatientPay = contract.ExpectedPatientPay ?? 0m;
+                    row.NetMargin = row.InsurancePayment + row.PatientPay - pricing.Price;
+                    row.IsUnderwater = row.NetMargin < 0;
+                }
+                catch
+                {
+                    row.MissingSnapshot = true;
+                }
+
+                breakdowns.Add(row);
+            }
+
+            // ── 6. Sort: best margin first, underwater last ───────────────────────────
+            var sorted = breakdowns
+                .OrderBy(r => r.IsUnderwater || r.MissingSnapshot)
+                .ThenByDescending(r => r.NetMargin)
+                .ToList();
+
+            // ── 7. Build header from the first available contract ────────────────────
+            var anyContract = contractsMap.Values.FirstOrDefault();
+            string contractLabel = anyContract != null
+                ? BuildContractLabel(anyContract)
+                : string.Empty;
+
+            return new DrugPriceWithInsuranceDto
+            {
+                DrugId = drug.Id,
+                DrugName = drug.Name,
+                NDC = drug.NDC,
+                Form = drug.Form,
+                Strength = drug.Strength,
+                InsurancePlanName = insuranceRx?.RxGroup ?? string.Empty,
+                ReimbursementType = anyContract?.ReimbursementType ?? string.Empty,
+                ContractLabel = contractLabel,
+                NoContractFound = !contractsMap.Any(),
+                Prices = sorted
+            };
+        }
+
+        // ── Label helper ──────────────────────────────────────────────────────────────
+        private static string BuildContractLabel(UserInsuranceContract c)
+        {
+            decimal fee = c.DispensingFee ?? 0m;
+
+            return c.ReimbursementType.ToUpperInvariant() switch
+            {
+                "AWP" => $"AWP − {c.AwpDiscountPercent ?? 0}% + ${fee:F2}",
+                "ASP" => $"ASP + {c.AspMarkupPercent ?? 0}%" + (fee > 0 ? $" + ${fee:F2}" : ""),
+                "MAC" => $"MAC ${c.MacPrice:F2}" + (fee > 0 ? $" + ${fee:F2}" : ""),
+                "FIXED" => $"Fixed ${c.FixedReimbursementAmount:F2}",
+                _ => c.ReimbursementType
+            };
+        }
+
+        //new code to show all data
+        public async Task<List<DrugWholesalerPrescriber>> GetAllPricesForPrescriberAsync(
     int prescriberId,
     CancellationToken ct = default)
 {

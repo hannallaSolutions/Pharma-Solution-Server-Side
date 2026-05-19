@@ -1,4 +1,5 @@
-﻿using SearchTool_ServerSide.Dtos.DrugWholesalerPrescriberDtos;
+﻿using SearchTool_ServerSide.Dtos;
+using SearchTool_ServerSide.Dtos.DrugWholesalerPrescriberDtos;
 using SearchTool_ServerSide.Models;
 using SearchTool_ServerSide.Repository;
 
@@ -161,6 +162,12 @@ namespace SearchTool_ServerSide.Services
             var result = await _repository.GetReimbursementParametersAsync(userId, insuranceRxId);
 
             return result;
+        }
+        public async Task<DrugPriceWithInsuranceDto?> GetDrugPriceWithInsuranceAsync(int drugId,
+    int branchId,
+    int insuranceRxId)
+        {
+            return await _repository.GetDrugPriceWithInsuranceAsync(drugId, branchId, insuranceRxId);
         }
     }
 
