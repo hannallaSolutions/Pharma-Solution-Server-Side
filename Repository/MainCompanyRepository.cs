@@ -59,10 +59,21 @@ internal async Task<MainCompany> CreateAsync(MainCompany mainCompany)
     return mainCompany;
 }
 
-        internal async Task<IEnumerable<MainCompany>> GetAllMainCompaniesAsync()
+      
+        internal async Task<IEnumerable<object>> GetAllMainCompaniesAsync()
+{
+    return await _context.MainCompanies
+        .Select(x => new
         {
-            return await _context.MainCompanies.ToListAsync();
-        }
+            id = x.Id,
+            name = x.Name,
+            specialtyId = x.SpecialtyId,
+            specialtyName = x.Specialty != null ? x.Specialty.Name : null,
+            classTypeId = x.ClassTypeId,
+            classTypeName = x.ClassType != null ? x.ClassType.Name : null
+        })
+        .ToListAsync();
+}
 
         internal async Task<MainCompany?> GetMainCompanyByIdAsync(int id)
         {
@@ -72,20 +83,38 @@ internal async Task<MainCompany> CreateAsync(MainCompany mainCompany)
         }
 
         //edit each row
-        internal async Task<bool> EditMainCompanyAsync(int id, MainCompany updatedCompany)
-        {
-            var existingCompany = await _context.MainCompanies.FindAsync(id);
-            if (existingCompany == null)
-            {
-                return false;
-            }
+      internal async Task<bool> EditMainCompanyAsync(int id, MainCompany updatedCompany)
+{
+    var existingCompany = await _context.MainCompanies.FindAsync(id);
 
-            existingCompany.Name = updatedCompany.Name;
-            existingCompany.SpecialtyId = updatedCompany.SpecialtyId;
+    if (existingCompany == null)
+    {
+        return false;
+    }
 
-            await _context.SaveChangesAsync();
-            return true;
-        }
+    existingCompany.Name = updatedCompany.Name;
+    existingCompany.SpecialtyId = updatedCompany.SpecialtyId;
+    existingCompany.ClassTypeId = updatedCompany.ClassTypeId;
+
+    await _context.SaveChangesAsync();
+    return true;
+}
         
+
+        internal async Task<bool> DeleteMainCompanyAsync(int id)
+{
+    var existingCompany = await _context.MainCompanies.FindAsync(id);
+
+    if (existingCompany == null)
+    {
+        return false;
+    }
+
+    _context.MainCompanies.Remove(existingCompany);
+    await _context.SaveChangesAsync();
+
+    return true;
+}
+
     }
 }

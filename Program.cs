@@ -16,51 +16,90 @@ using System.Text;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
+
 var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>();
 if (jwtOptions == null)
 {
     throw new ArgumentNullException(nameof(jwtOptions));
 }
+
 builder.Services.AddSingleton(jwtOptions);
+
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy("SuperAdmin",
-    builder => { builder.RequireRole("SuperAdmin"); });
-    options.AddPolicy("Admin",
-    builder => { builder.RequireRole("Admin", "SuperAdmin"); });
-    options.AddPolicy("Pharmacist",
-    builder => { builder.RequireRole("Pharmacist", "Admin", "SuperAdmin", "Doctor"); });
-    options.AddPolicy("Doctor",
-    builder => { builder.RequireRole("Pharmacist", "Admin", "SuperAdmin", "Doctor"); });
+    options.AddPolicy("SuperAdmin", policy =>
+    {
+        policy.RequireRole("SuperAdmin");
+    });
 
+    options.AddPolicy("Admin", policy =>
+    {
+        policy.RequireRole("Admin", "SuperAdmin");
+    });
+
+    options.AddPolicy("Pharmacist", policy =>
+    {
+        policy.RequireRole("Pharmacist", "Admin", "SuperAdmin", "Doctor");
+    });
+
+    options.AddPolicy("Doctor", policy =>
+    {
+        policy.RequireRole("Pharmacist", "Admin", "SuperAdmin", "Doctor");
+    });
 });
 
-builder.Services.AddAuthentication()
-        .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
+    {
+        options.SaveToken = true;
+        options.TokenValidationParameters = new TokenValidationParameters
         {
-            options.SaveToken = true;
-            options.TokenValidationParameters = new TokenValidationParameters
-            {
-                ValidateIssuer = true,
-                ValidIssuer = jwtOptions.Issuer,
-                ValidateAudience = true,
-                ValidAudience = jwtOptions.Audience,
-                ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey)),
-            };
+            ValidateIssuer = true,
+            ValidIssuer = jwtOptions.Issuer,
+            ValidateAudience = true,
+            ValidAudience = jwtOptions.Audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtOptions.SigningKey)
+            )
+        };
+    });
 
-        });
-builder.Services.AddDbContext<SearchToolDBContext>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("SearchTool")));
-builder.Services.AddDbContext<GlobalDBContext>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("Global")));
+builder.Services.AddDbContext<SearchToolDBContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("SearchTool")));
+
+builder.Services.AddDbContext<GlobalDBContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("Global")));
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
-//////////////////////////////////////////////
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("CorsPolicy", policy =>
+    {
+        policy.WithOrigins(
+                "https://medisearchtool.com",
+                "https://pharmacy.medisearchtool.com",
+                "https://medi-dev-test.hanna-west.com",
+                "https://medi-beta-dev.brightpointsummit.com",
+                "http://medi-beta-dev.brightpointsummit.com",
+                "http://localhost:5173",
+                "http://localhost:5174",
+                "http://127.0.0.1:8000"
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
+
 builder.Services.AddScoped<UserAccessToken>();
 builder.Services.AddScoped(typeof(IRepository<>), typeof(GenericRepository<>));
+
 builder.Services.AddScoped<DrugRepository>();
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<LogRepository>();
@@ -72,11 +111,10 @@ builder.Services.AddScoped<SearchLogRepository>();
 builder.Services.AddScoped<NadacRepository>();
 builder.Services.AddScoped<MainCompanyRepository>();
 builder.Services.AddScoped<DrugClassRepository>();
-builder.Services.AddScoped<BranchRepository>();
 builder.Services.AddScoped<DiseaseRepository>();
 builder.Services.AddScoped<DrugWholesalerPrescriberRepository>();
+builder.Services.AddScoped<ScriptsRepository>();
 
-//////////////////////////////////////////////
 builder.Services.AddScoped<NadacService>();
 builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<DrugService>();
@@ -90,63 +128,37 @@ builder.Services.AddScoped<DrugClassService>();
 builder.Services.AddScoped<BranchService>();
 builder.Services.AddScoped<DiseaseService>();
 builder.Services.AddScoped<DrugWholesalerPrescriberService>();
+builder.Services.AddScoped<ScriptsService>();
 
 builder.Services.AddScoped<IChatOrchestratorService, ChatOrchestratorService>();
+builder.Services.AddScoped<CompanyFeatureSettingService>();
 
-//for email campaign
 builder.Services.AddScoped<EmailCampaignService>();
 builder.Services.AddScoped<RecipientFileParserService>();
 builder.Services.AddScoped<EmailSenderService>();
-//////////////////////////////////////////////
 builder.Services.AddScoped<LocalEmailValidationService>();
-//////////////////////////////////////////////
-builder.Services.Configure<GeminiOptions>(builder.Configuration.GetSection("Gemini"));
+
+builder.Services.Configure<GeminiOptions>(
+    builder.Configuration.GetSection("Gemini")
+);
+
 builder.Services.AddHttpClient<IGeminiChatService, GeminiChatService>(client =>
 {
     client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
 });
-builder.Services.AddScoped<ScriptsRepository>();
-builder.Services.AddScoped<ScriptsService>();
 
-//////////////////////////////////////////////
 builder.Services.AddSwaggerGen();
-builder.Services.AddControllers();
 builder.Services.AddAutoMapper(cfg => { }, typeof(Program).Assembly);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddMemoryCache();
 
-//for permissions
 builder.Services.AddScoped<IAuthorizationHandler, PermissionHandler>();
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
-builder.Services.AddAuthorization();
+
 builder.Services.AddSingleton<IUserLogQueue, UserLogQueue>();
 builder.Services.AddHostedService<UserLogBackgroundService>();
 
-var allowedOrigins = new List<string>
-{
-    "https://medisearchtool.com",
-    "https://pharmacy.medisearchtool.com",
-    "https://medi-dev-test.hanna-west.com",
-    "https://medi-beta-dev.brightpointsummit.com",
-    "http://medi-beta-dev.brightpointsummit.com",
-    "http://localhost:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:8000",
-
-};
-
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("CorsPolicy", policy =>
-    {
-        policy.WithOrigins(allowedOrigins.ToArray())
-              .AllowCredentials()
-              .AllowAnyHeader()
-              .AllowAnyMethod();
-    });
-});
-
-
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var app = builder.Build();
 
@@ -160,7 +172,10 @@ app.UseHttpsRedirection();
 //app.UseCors("CorsPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
+
 app.UseMiddleware<UserLogsMiddleware>();
 app.UseMiddleware<PermissionMiddleware>();
+
 app.MapControllers();
+
 app.Run();

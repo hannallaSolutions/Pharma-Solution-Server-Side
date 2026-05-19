@@ -147,10 +147,14 @@ namespace SearchTool_ServerSide.Data
 
         public DbSet<Permission> Permissions { get; set; }
         public DbSet<RolePermission> RolePermissions { get; set; }
+public DbSet<MainCompanyFeatureSetting> MainCompanyFeatureSettings { get; set; }
+
         public DbSet<Chat> Chats { get; set; }
         public DbSet<Message> Messages { get; set; }
         public DbSet<Wholesaler> Wholesalers { get; set; }
         public DbSet<DrugWholesalerPrescriber> DrugWholesalerPrescribers { get; set; }
+
+
         public DbSet<UserInsuranceContract> UserInsuranceContracts { get; set; }
         // New DbSets for Permissions
 
@@ -481,7 +485,35 @@ modelBuilder.Entity<UserDiseaseVisibility>()
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
+//feature settings
+modelBuilder.Entity<MainCompanyFeatureSetting>(entity =>
+{
+    entity.HasKey(x => x.Id);
 
+    entity.Property(x => x.FeatureKey)
+        .IsRequired()
+        .HasMaxLength(150);
+
+    entity.Property(x => x.SelectedOptionKeysJson)
+        .IsRequired();
+
+    entity.HasIndex(x => new { x.MainCompanyId, x.FeatureKey }) //prevent making same company having same feature key multiple times
+        .IsUnique();
+});
+
+
+//for indexing drugswholsalesdata
+modelBuilder.Entity<DrugWholesalerPrescriber>()
+    .HasIndex(x => new
+    {
+        x.DrugId,
+        x.WholesalerId,
+        x.PrescriberId,
+        x.PriceDate,
+        x.Price
+    })
+    .IsUnique();
+    
             // for userpermissions as up
             /*
               modelBuilder.Entity<UserPermission>(entity =>

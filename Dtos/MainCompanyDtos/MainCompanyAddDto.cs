@@ -23,4 +23,13 @@ public class MainCompanyDto
     public int? ClassTypeId { get; set; }
 }
 
+
+
+    public class EditMainCompanyDto
+    {
+        public string Name { get; set; }
+        public int SpecialtyId { get; set; }
+        public int? ClassTypeId { get; set; }
+    }
+
 }

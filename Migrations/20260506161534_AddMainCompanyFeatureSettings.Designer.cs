@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SearchTool_ServerSide.Data;
@@ -11,9 +12,11 @@ using SearchTool_ServerSide.Data;
 namespace SearchTool_ServerSide.Migrations
 {
     [DbContext(typeof(SearchToolDBContext))]
-    partial class SearchToolDBContextModelSnapshot : ModelSnapshot
+    [Migration("20260506161534_AddMainCompanyFeatureSettings")]
+    partial class AddMainCompanyFeatureSettings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -343,7 +346,7 @@ namespace SearchTool_ServerSide.Migrations
                         {
                             Id = 1,
                             Mode = 1,
-                            UpdatedAt = new DateTime(2026, 5, 18, 19, 4, 43, 508, DateTimeKind.Utc).AddTicks(3523)
+                            UpdatedAt = new DateTime(2026, 5, 6, 16, 15, 18, 51, DateTimeKind.Utc).AddTicks(2634)
                         });
                 });
 
@@ -649,118 +652,6 @@ namespace SearchTool_ServerSide.Migrations
                     b.HasIndex("DrugId");
 
                     b.ToTable("DrugMedis");
-                });
-
-            modelBuilder.Entity("SearchTool_ServerSide.Models.DrugWholesaler", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("DrugId")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<decimal>("Price")
-                        .HasColumnType("numeric");
-
-                    b.Property<DateTime>("PriceDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("QuarterYear")
-                        .HasColumnType("text");
-
-                    b.Property<string>("SourceFileName")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("WholesalerId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DrugId");
-
-                    b.HasIndex("WholesalerId");
-
-                    b.ToTable("DrugWholesaler");
-                });
-
-            modelBuilder.Entity("SearchTool_ServerSide.Models.DrugWholesalerPrescriber", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<decimal?>("ASP")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal?>("AWP")
-                        .HasColumnType("numeric");
-
-                    b.Property<string>("BillingUnit")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("DrugClass")
-                        .HasColumnType("text");
-
-                    b.Property<int>("DrugId")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<decimal?>("MAC")
-                        .HasColumnType("numeric");
-
-                    b.Property<int>("PrescriberId")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("Price")
-                        .HasColumnType("numeric");
-
-                    b.Property<DateTime>("PriceDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("QuarterYear")
-                        .HasColumnType("text");
-
-                    b.Property<string>("SourceFileName")
-                        .HasColumnType("text");
-
-                    b.Property<string>("SourcePath")
-                        .HasColumnType("text");
-
-                    b.Property<decimal?>("WAC")
-                        .HasColumnType("numeric");
-
-                    b.Property<int>("WholesalerId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PrescriberId");
-
-                    b.HasIndex("WholesalerId");
-
-                    b.HasIndex("DrugId", "WholesalerId", "PrescriberId", "PriceDate", "Price")
-                        .IsUnique();
-
-                    b.ToTable("DrugWholesalerPrescribers");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.FeedbackFormEntry", b =>
@@ -1307,26 +1198,14 @@ namespace SearchTool_ServerSide.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<decimal?>("AWP")
-                        .HasColumnType("numeric");
-
                     b.Property<decimal>("AcquisitionCost")
                         .HasColumnType("numeric");
-
-                    b.Property<int?>("DaySupply")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("DaySupplyEndDate")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal>("Discount")
                         .HasColumnType("numeric");
 
                     b.Property<int>("DrugId")
                         .HasColumnType("integer");
-
-                    b.Property<decimal?>("GrossProfit")
-                        .HasColumnType("numeric");
 
                     b.Property<int>("InsuranceId")
                         .HasColumnType("integer");
@@ -1338,9 +1217,6 @@ namespace SearchTool_ServerSide.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<decimal?>("OriginalNetProfit")
-                        .HasColumnType("numeric");
-
                     b.Property<string>("PF")
                         .IsRequired()
                         .HasColumnType("text");
@@ -1348,17 +1224,8 @@ namespace SearchTool_ServerSide.Migrations
                     b.Property<decimal>("PatientPayment")
                         .HasColumnType("numeric");
 
-                    b.Property<string>("Priority")
-                        .HasColumnType("text");
-
                     b.Property<decimal>("Quantity")
                         .HasColumnType("numeric");
-
-                    b.Property<int?>("Refill")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("RefillDate")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("RemainingStock")
                         .HasColumnType("integer");
@@ -1367,27 +1234,12 @@ namespace SearchTool_ServerSide.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("RxStatus")
-                        .HasColumnType("text");
-
-                    b.Property<decimal?>("SDRA")
-                        .HasColumnType("numeric");
-
                     b.Property<int>("ScriptId")
                         .HasColumnType("integer");
-
-                    b.Property<string>("Status")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Unit")
-                        .HasColumnType("text");
 
                     b.Property<string>("UserEmail")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<decimal?>("WAC")
-                        .HasColumnType("numeric");
 
                     b.HasKey("Id");
 
@@ -1586,95 +1438,6 @@ namespace SearchTool_ServerSide.Migrations
                         .IsUnique();
 
                     b.ToTable("UserDiseaseVisibility");
-                });
-
-            modelBuilder.Entity("SearchTool_ServerSide.Models.UserInsuranceContract", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<decimal?>("AspMarkupPercent")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal?>("AwpDiscountPercent")
-                        .HasColumnType("numeric");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal?>("DispensingFee")
-                        .HasColumnType("numeric");
-
-                    b.Property<DateTime?>("EffectiveFrom")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("EffectiveTo")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal?>("ExpectedPatientPay")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal?>("FixedReimbursementAmount")
-                        .HasColumnType("numeric");
-
-                    b.Property<int>("InsuranceRxId")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<decimal?>("MacPrice")
-                        .HasColumnType("numeric");
-
-                    b.Property<string>("Notes")
-                        .HasColumnType("text");
-
-                    b.Property<string>("ReimbursementType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("InsuranceRxId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("UserInsuranceContracts");
-                });
-
-            modelBuilder.Entity("SearchTool_ServerSide.Models.Wholesaler", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Wholesalers");
                 });
 
             modelBuilder.Entity("ServerSide.Models.Script", b =>
@@ -1924,52 +1687,6 @@ namespace SearchTool_ServerSide.Migrations
                         .IsRequired();
 
                     b.Navigation("Drug");
-                });
-
-            modelBuilder.Entity("SearchTool_ServerSide.Models.DrugWholesaler", b =>
-                {
-                    b.HasOne("SearchTool_ServerSide.Models.Drug", "Drug")
-                        .WithMany()
-                        .HasForeignKey("DrugId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SearchTool_ServerSide.Models.Wholesaler", "Wholesaler")
-                        .WithMany("DrugWholesalers")
-                        .HasForeignKey("WholesalerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Drug");
-
-                    b.Navigation("Wholesaler");
-                });
-
-            modelBuilder.Entity("SearchTool_ServerSide.Models.DrugWholesalerPrescriber", b =>
-                {
-                    b.HasOne("SearchTool_ServerSide.Models.Drug", "Drug")
-                        .WithMany()
-                        .HasForeignKey("DrugId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SearchTool_ServerSide.Models.User", "Prescriber")
-                        .WithMany()
-                        .HasForeignKey("PrescriberId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SearchTool_ServerSide.Models.Wholesaler", "Wholesaler")
-                        .WithMany("UserDrugWholesalers")
-                        .HasForeignKey("WholesalerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Drug");
-
-                    b.Navigation("Prescriber");
-
-                    b.Navigation("Wholesaler");
                 });
 
             modelBuilder.Entity("SearchTool_ServerSide.Models.InsurancePCN", b =>
@@ -2269,25 +1986,6 @@ namespace SearchTool_ServerSide.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("SearchTool_ServerSide.Models.UserInsuranceContract", b =>
-                {
-                    b.HasOne("SearchTool_ServerSide.Models.InsuranceRx", "InsuranceRx")
-                        .WithMany()
-                        .HasForeignKey("InsuranceRxId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SearchTool_ServerSide.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("InsuranceRx");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("ServerSide.Models.Script", b =>
                 {
                     b.HasOne("SearchTool_ServerSide.Models.Branch", "Branch")
@@ -2395,13 +2093,6 @@ namespace SearchTool_ServerSide.Migrations
                     b.Navigation("Logs");
 
                     b.Navigation("SearchDrugDetailsLogs");
-                });
-
-            modelBuilder.Entity("SearchTool_ServerSide.Models.Wholesaler", b =>
-                {
-                    b.Navigation("DrugWholesalers");
-
-                    b.Navigation("UserDrugWholesalers");
                 });
 
             modelBuilder.Entity("ServerSide.Models.Script", b =>
