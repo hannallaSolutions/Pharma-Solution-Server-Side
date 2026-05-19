@@ -3,7 +3,7 @@ name: Deploy to EC2
 on:
   push:
     branches:
-      - Live
+      - dev
 
 jobs:
   deploy:
@@ -22,7 +22,7 @@ jobs:
             cd /home/ec2-user/src/SearchTool_build || exit
             git remote set-url origin https://github.com/Mohamed2670/Pharma-Solution-Server-Side.git
             git fetch --all
-            git reset --hard origin/Liev
+            git reset --hard origin/dev
             rm -rf ./publish
             mkdir -p ./publish
             dotnet clean

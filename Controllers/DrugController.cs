@@ -108,7 +108,7 @@ namespace SearchTool_ServerSide.Controllers
         {
             var tokenData = userAccessToken.tokenData();
 
-            var items = await _drugService.GetDetails(ndc, sourceInsuranceId, insuranceId,int.Parse(tokenData.BranchId));
+            var items = await _drugService.GetDetails(ndc, sourceInsuranceId, insuranceId,int.Parse(tokenData.BranchId),int.Parse(tokenData.UserId));
             return Ok(items);
         }
 

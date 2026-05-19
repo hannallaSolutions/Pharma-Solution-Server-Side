@@ -24,7 +24,7 @@ namespace SearchTool_ServerSide.Controllers
                 return BadRequest(ex.Message);
             }
         }
-        [HttpGet("reimbursement-parameters")]
+        [HttpGet("reimbursement-parameters")]     
         public async Task<IActionResult> GetReimbursementParameters([FromQuery]int insuranceRxId)
         {
             var tokenData = userAccessToken.tokenData();
