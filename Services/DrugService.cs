@@ -300,10 +300,10 @@ namespace SearchTool_ServerSide.Services
         string? pcn = null,
         string? bin = null,
         string? diseaseName = null,
-        int branchId = 1, bool isDemo = false)
+        int branchId = 1, bool isDemo = false,int userId=0)
         {
             return await _drugRepository.GetAlternativesWithInsurance(classInfoId, 
-            sourceDrugNDC, sourceRxGroupId, matchedRx, pageNumber, pageSize, rxgroup, pcn, bin, diseaseName, branchId,isDemo);
+            sourceDrugNDC, sourceRxGroupId, matchedRx, pageNumber, pageSize, rxgroup, pcn, bin, diseaseName, branchId,isDemo,userId);
         }
         internal async Task<AlternativesFilterOptionsDto> GetAlternativesWithInsuranceFilters(int classInfoId, string sourceDrugNDC, string? rxgroup = null, string? pcn = null, string? bin = null)
         {

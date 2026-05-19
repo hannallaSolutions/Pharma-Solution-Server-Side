@@ -364,7 +364,7 @@ namespace SearchTool_ServerSide.Controllers
 
             var items = await _drugService.GetAlternativesWithInsurance(
                 classInfoId, sourceDrugNDC, sourceRxGroupId, matchedRx, pageNumber,
-                 pageSize, rxgroup, pcn, bin, diseaseName,int.Parse(tokenData.BranchId), isDemo);
+                 pageSize, rxgroup, pcn, bin, diseaseName,int.Parse(tokenData.BranchId), isDemo,int.Parse(tokenData.UserId));
             return Ok(items);
         }
         [HttpGet("GetAlternativesWithInsuranceFilters"), AllowAnonymous]
