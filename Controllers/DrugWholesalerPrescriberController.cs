@@ -26,7 +26,6 @@ namespace SearchTool_ServerSide.Controllers
                 return BadRequest(ex.Message);
             }
         }
-*/
 
         [HttpPost("contracts")]
         public async Task<IActionResult> AddContract(
@@ -43,6 +42,7 @@ namespace SearchTool_ServerSide.Controllers
 
                 request.UserId = int.Parse(userId);
 
+<<<<<<< Updated upstream
                 var contract = await _service.AddContractAsync(request);
                 return Ok(contract);
             }
@@ -51,7 +51,49 @@ namespace SearchTool_ServerSide.Controllers
                 return BadRequest(ex.Message);
             }
         }
+=======
+        var contract = await _service.AddContractAsync(request);
+        return Ok(contract);
+    }
+    catch (ArgumentException ex)
+    {
+        return BadRequest(ex.Message);
+    }
+}
+*/
 
+[HttpPost("contracts")]
+public async Task<IActionResult> AddContract(
+    [FromBody] AddUserInsuranceContractRequest request)
+{
+    try
+    {
+        var tokenData = userAccessToken.tokenData();
+
+        if (tokenData == null || tokenData.UserId == null)
+        {
+            return BadRequest("Invalid user data.");
+        }
+
+        request.UserId = int.Parse(tokenData.UserId);
+
+        var contract = await _service.AddContractAsync(request);
+        return Ok(contract);
+    }
+    catch (ArgumentException ex)
+    {
+        return BadRequest(ex.Message);
+    }
+    catch (Exception ex)
+    {
+        return StatusCode(500, new
+        {
+            message = "An error occurred while saving contract.",
+            error = ex.Message,
+            innerError = ex.InnerException?.Message
+        });
+    }
+}
         [HttpGet("reimbursement-parameters")]
         public async Task<IActionResult> GetReimbursementParameters([FromQuery] int insuranceRxId)
         {
