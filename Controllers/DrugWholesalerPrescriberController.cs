@@ -203,7 +203,7 @@ public async Task<IActionResult> AddContract(
                 });
             }
         }
-
+/*
         // =====================================================
         // Get latest prices for drug and prescriber
         // GET: api/DrugWholesalerPrescriber/latest?drugId=1&prescriberId=2
@@ -243,7 +243,55 @@ public async Task<IActionResult> AddContract(
                 });
             }
         }
+*/
+// =====================================================
+// Get latest prices for drug and logged-in prescriber
+// GET: DrugWholesalerPrescriber/latest?drugId=1
+// =====================================================
+[HttpGet("latest")]
+public async Task<IActionResult> GetLatestPricesForDrug(
+    [FromQuery] int drugId,
+    CancellationToken ct)
+{
+    try
+    {
+        var tokenData = userAccessToken.tokenData();
 
+        if (tokenData == null || tokenData.UserId == null)
+        {
+            return BadRequest("Invalid user data.");
+        }
+
+        var prescriberId = int.Parse(tokenData.UserId);
+
+        var result = await _service.GetLatestPricesForDrugAsync(
+            drugId,
+            prescriberId,
+            ct);
+
+        return Ok(new
+        {
+            message = "Latest prices loaded successfully.",
+            data = result
+        });
+    }
+    catch (ArgumentException ex)
+    {
+        return BadRequest(new
+        {
+            message = ex.Message
+        });
+    }
+    catch (Exception ex)
+    {
+        return StatusCode(500, new
+        {
+            message = "An error occurred while loading latest prices.",
+            error = ex.Message,
+            innerError = ex.InnerException?.Message
+        });
+    }
+}
         // =====================================================
         // Get best price for drug and prescriber
         // GET: api/DrugWholesalerPrescriber/best?drugId=1&prescriberId=2

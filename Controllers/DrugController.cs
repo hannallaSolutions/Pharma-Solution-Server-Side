@@ -346,7 +346,7 @@ namespace SearchTool_ServerSide.Controllers
         }
 
         [HttpGet("GetAlternativesWithInsurance"), AllowAnonymous]
-        public async Task<IActionResult> GetAlternativesWithInsurance(
+    public async Task<IActionResult> GetAlternativesWithInsurance(
             [FromQuery] int classInfoId,
             [FromQuery] string sourceDrugNDC,
             [FromQuery] int sourceRxGroupId,
@@ -367,6 +367,7 @@ namespace SearchTool_ServerSide.Controllers
                  pageSize, rxgroup, pcn, bin, diseaseName,int.Parse(tokenData.BranchId), isDemo,int.Parse(tokenData.UserId));
             return Ok(items);
         }
+        
         [HttpGet("GetAlternativesWithInsuranceFilters"), AllowAnonymous]
         public async Task<ActionResult<AlternativesFilterOptionsDto>> GetAlternativesWithInsuranceFilters(
             [FromQuery] int classInfoId,
