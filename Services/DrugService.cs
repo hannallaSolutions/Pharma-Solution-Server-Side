@@ -76,7 +76,7 @@ namespace SearchTool_ServerSide.Services
 
         internal async Task<DrugsAlternativesReadDto> GetDetails(string ndc, int sourceInsuranceId, int? insuranceId,int branchId,int userId)
         {
-            var item = await _drugRepository.GetDetails(ndc, sourceInsuranceId, insuranceId,branchId);
+            var item = await _drugRepository.GetDetails(ndc, sourceInsuranceId, insuranceId,branchId,userId);
             return item;
         }
 
