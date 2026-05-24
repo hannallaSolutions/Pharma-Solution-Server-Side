@@ -102,7 +102,7 @@ namespace SearchTool_ServerSide.Controllers
             var item = await _drugService.GetBySelection(name, ndc, insuranceName);
             return Ok(item);
         }
-
+/*
         [HttpGet("GetDetails"), AllowAnonymous]
         public async Task<IActionResult> GetDetails([FromQuery] string ndc, [FromQuery] int sourceInsuranceId, [FromQuery] int? insuranceId = 0)
         {
@@ -111,6 +111,35 @@ namespace SearchTool_ServerSide.Controllers
             var items = await _drugService.GetDetails(ndc, sourceInsuranceId, insuranceId,int.Parse(tokenData.BranchId),int.Parse(tokenData.UserId));
             return Ok(items);
         }
+*/
+        [HttpGet("GetDetails")]
+[AllowAnonymous]
+public async Task<IActionResult> GetDetails(
+    [FromQuery] string ndc,
+    [FromQuery] int sourceInsuranceId,
+    [FromQuery] int? insuranceId = null)
+{
+    var tokenData = userAccessToken.tokenData();
+
+    int branchId = 1;
+    int userId = 1;
+
+    if (tokenData != null)
+    {
+        int.TryParse(tokenData.BranchId, out branchId);
+        int.TryParse(tokenData.UserId, out userId);
+    }
+
+    var result = await _drugService.GetDetails(
+        ndc,
+        sourceInsuranceId,
+        insuranceId,
+        branchId,
+        userId
+    );
+
+    return Ok(result);
+}
 
         [HttpGet("GetClassById")]
         public async Task<IActionResult> getClassbyId([FromQuery] int id)
