@@ -207,7 +207,7 @@ namespace SearchTool_ServerSide.Controllers
         {
             var tokenData = userAccessToken.tokenData();
             bool isDemo = tokenData.UserRole == "Demo" ? true : false;
-            var items = await _drugService.GetDrugsByInsuranceNamePaginated(insurance, drugName, pageSize, pageNumber, isDemo);
+            var items = await _drugService.GetDrugsByInsuranceNamePaginated(insurance, drugName, pageSize, pageNumber, isDemo,int.Parse(tokenData.BranchId));
             return Ok(items);
         }
         [HttpGet("GetDrugsByPCNPagintated")]
@@ -215,7 +215,7 @@ namespace SearchTool_ServerSide.Controllers
         {
             var tokenData = userAccessToken.tokenData();
             bool isDemo = tokenData.UserRole == "Demo" ? true : false;
-            var items = await _drugService.GetDrugsByPCNPaginated(insurance, drugName, pageSize, pageNumber, isDemo);
+            var items = await _drugService.GetDrugsByPCNPaginated(insurance, drugName, pageSize, pageNumber, isDemo, int.Parse(tokenData.BranchId));
             return Ok(items);
         }
         [HttpGet("GetDrugsByBINPagintated")]
@@ -223,7 +223,7 @@ namespace SearchTool_ServerSide.Controllers
         {
             var tokenData = userAccessToken.tokenData();
             bool isDemo = tokenData.UserRole == "Demo" ? true : false;
-            var items = await _drugService.GetDrugsByBINPaginated(insurance, drugName, pageSize, pageNumber, isDemo);
+            var items = await _drugService.GetDrugsByBINPaginated(insurance, drugName, pageSize, pageNumber, isDemo, int.Parse(tokenData.BranchId));
             return Ok(items);
         }
         [HttpGet("GetDrugsByInsuranceNameDrugName")]

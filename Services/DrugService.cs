@@ -242,17 +242,17 @@ namespace SearchTool_ServerSide.Services
             return items;
         }
 
-        internal async Task<ICollection<Drug>> GetDrugsByInsuranceNamePaginated(string insurance, string drugName, int pageSize, int pageNumber, bool isDemo = false)
+        internal async Task<ICollection<Drug>> GetDrugsByInsuranceNamePaginated(string insurance, string drugName, int pageSize, int pageNumber, bool isDemo = false,int branchId =1)
         {
-            return await _drugRepository.GetDrugsByInsuranceNamePaginated(insurance, drugName, pageSize, pageNumber,isDemo);
+            return await _drugRepository.GetDrugsByInsuranceNamePaginated(insurance, drugName, pageSize, pageNumber,isDemo,branchId);
         }
-        internal async Task<ICollection<Drug>> GetDrugsByPCNPaginated(string insurance, string drugName, int pageSize, int pageNumber, bool isDemo = false)
+        internal async Task<ICollection<Drug>> GetDrugsByPCNPaginated(string insurance, string drugName, int pageSize, int pageNumber, bool isDemo = false, int branchId = 1)
         {
-            return await _drugRepository.GetDrugsByPCNPaginated(insurance, drugName, pageSize, pageNumber,isDemo);
+            return await _drugRepository.GetDrugsByPCNPaginated(insurance, drugName, pageSize, pageNumber,isDemo, branchId);
         }
-        internal async Task<ICollection<Drug>> GetDrugsByBINPaginated(string insurance, string drugName, int pageSize, int pageNumber, bool isDemo = false)
+        internal async Task<ICollection<Drug>> GetDrugsByBINPaginated(string insurance, string drugName, int pageSize, int pageNumber, bool isDemo = false, int branchId = 1)
         {
-            return await _drugRepository.GetDrugsByBINPaginated(insurance, drugName, pageSize, pageNumber, isDemo);
+            return await _drugRepository.GetDrugsByBINPaginated(insurance, drugName, pageSize, pageNumber, isDemo, branchId);
         }
 
         internal async Task<ICollection<DrugModal>> GetDrugClassesByInsuranceNamePagintated(string insurance, string drugClassName, int pageSize, int pageNumber, string ClassVersion = "ClassV1")
