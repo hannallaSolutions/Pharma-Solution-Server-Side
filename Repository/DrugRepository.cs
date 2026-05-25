@@ -2552,13 +2552,13 @@ namespace SearchTool_ServerSide.Repository
                 }
                 if (!userDict.ContainsKey(record.User))
                 {
-                    var newUser = new User { ShortName = record.User, Name = record.User, Email = $"{record.User}@pharmacy.com", Password = BCrypt.Net.BCrypt.HashPassword("DefaultPass123"), BranchId = branch.Id };
+                    var newUser = new User {Role = Role.Doctor, ShortName = record.User, Name = record.User, Email = $"{record.User}@pharmacy.com", Password = BCrypt.Net.BCrypt.HashPassword("DefaultPass123"), BranchId = branch.Id };
                     newUsers.Add(newUser);
                     userDict[record.User] = newUser;
                 }
                 if (!userDict.ContainsKey(record.Prescriber))
                 {
-                    var newPrescriber = new User { ShortName = record.Prescriber, Name = record.Prescriber, Email = $"{record.Prescriber}@pharmacy.com", Password = BCrypt.Net.BCrypt.HashPassword("DefaultPass123"), BranchId = branch.Id };
+                    var newPrescriber = new User {Role = Role.Doctor ,ShortName = record.Prescriber, Name = record.Prescriber, Email = $"{record.Prescriber}@pharmacy.com", Password = BCrypt.Net.BCrypt.HashPassword("DefaultPass123"), BranchId = branch.Id };
                     newUsers.Add(newPrescriber);
                     userDict[record.Prescriber] = newPrescriber;
                 }
@@ -3586,6 +3586,7 @@ internal async Task<DrugsAlternativesReadDto?> GetDetails(
                  && p.Drug.NDC     == ndc
                  && p.IsActive)
         .OrderByDescending(p => p.PriceDate)
+        .ThenBy(p=>p.Price)
         .ThenByDescending(p => p.CreatedAt)
         .FirstOrDefaultAsync();
 
