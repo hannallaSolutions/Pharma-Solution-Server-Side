@@ -122,18 +122,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddSingleton<IUserLogQueue, UserLogQueue>();
 builder.Services.AddHostedService<UserLogBackgroundService>();
 
-var allowedOrigins = new List<string>
-{
-    "https://medisearchtool.com",
-    "https://pharmacy.medisearchtool.com",
-    "https://medi-dev-test.hanna-west.com",
-    "https://medi-beta-dev.brightpointsummit.com",
-    "http://medi-beta-dev.brightpointsummit.com",
-    "http://localhost:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:8000",
 
-};
 /*
 builder.Services.AddCors(options =>
 {
@@ -146,18 +135,33 @@ builder.Services.AddCors(options =>
     });
 });
 */
+
+var allowedOrigins = new[]
+{
+    "https://medisearchtool.com",
+    "https://www.medisearchtool.com",
+    "https://pharmacy.medisearchtool.com",
+    "https://medi-dev-test.hanna-west.com",
+    "https://medi-beta-dev.brightpointsummit.com",
+
+    // Development
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "https://localhost:5173",
+    "https://localhost:5174",
+    "http://127.0.0.1:8000"
+};
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowFrontend", policy =>
+    options.AddPolicy("CorsPolicy", policy =>
     {
-        policy
-            .WithOrigins("http://localhost:5173")
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials();
+        policy.WithOrigins(allowedOrigins)
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
     });
 });
-
 // Add this before builder.Build()
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 var app = builder.Build();
@@ -168,16 +172,16 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-//app.UseHttpsRedirection();
-app.UseCors("AllowFrontend");
-
 app.UseHttpsRedirection();
-//app.UseCors("CorsPolicy");
 
-//app.UseCors("CorsPolicy");
+app.UseCors("CorsPolicy");
+
 app.UseAuthentication();
 app.UseAuthorization();
+
 app.UseMiddleware<UserLogsMiddleware>();
 app.UseMiddleware<PermissionMiddleware>();
+
 app.MapControllers();
+
 app.Run();
