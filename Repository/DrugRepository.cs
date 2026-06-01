@@ -3268,7 +3268,7 @@ namespace SearchTool_ServerSide.Repository
                     {
                         ShortName = safePrescriberName,
                         Name = safePrescriberName,
-                        Email = safePrescriberName,
+                        Email = safePrescriberName+"@Pharma.com",
                         Password = BCrypt.Net.BCrypt.HashPassword("DefaultPass123"),
                         BranchId = branch.Id,
                         Role = Role.Doctor,
@@ -3510,180 +3510,288 @@ namespace SearchTool_ServerSide.Repository
             var allItems2 = await _context.DrugInsurances.Include(x => x.Drug).Where(x => x.Drug.Name == drugName && x.ScriptCode != null).Select(x => x.NDCCode).ToListAsync();
             return (new List<string>(), allItems2);
         }
-internal async Task<DrugsAlternativesReadDto?> GetDetails(
-    string ndc,
-    int sourceInsuranceId,
-    int? insuranceId = null,
-    int branchId = 1,
-    int userId = 1)
-{
-    if (insuranceId == 0) insuranceId = null;
-
-    // ── Base projection (newest first) ────────────────────────────────────────
-    IQueryable<dynamic> BaseQuery(bool requireScript, int? forceInsuranceId)
-    {
-        var q =
-            from di   in _context.DrugInsurances.AsNoTracking()
-            join d    in _context.Drugs.AsNoTracking()        on di.DrugId          equals d.Id
-            join irx  in _context.InsuranceRxes.AsNoTracking() on di.InsuranceId    equals irx.Id
-            join ipcn in _context.InsurancePCNs.AsNoTracking() on irx.InsurancePCNId equals ipcn.Id
-            join ins  in _context.Insurances.AsNoTracking()   on ipcn.InsuranceId   equals ins.Id
-            where di.NDCCode == ndc && d.NDC == ndc
-            select new
-            {
-                DrugInsurance = di,
-                Bin           = ins.Bin,
-                BinFullName   = ins.Name,
-                RxGroup       = irx.RxGroup,
-                PCN           = ipcn.PCN,
-                pcnId         = ipcn.Id,
-                rxgroupId     = irx.Id,
-                binId         = ins.Id,
-                Drug          = d
-            };
-
-        if (requireScript)
-            q = q.Where(x => x.DrugInsurance.ScriptCode != null
-                          && x.DrugInsurance.ScriptCode != "");
-
-        if (forceInsuranceId.HasValue)
-            q = q.Where(x => x.DrugInsurance.InsuranceId == forceInsuranceId.Value);
-
-        return q.OrderByDescending(x => x.DrugInsurance.Date)
-                .ThenByDescending(x => x.DrugInsurance.Id);
-    }
-
-    // ── 1. Try with the provided insurance (must have ScriptCode) ─────────────
-    var chosen = insuranceId.HasValue
-        ? await BaseQuery(requireScript: true, forceInsuranceId: insuranceId).FirstOrDefaultAsync()
-        : null;
-
-    // ── 2. Fallback: any insurance for this NDC (still must have ScriptCode) ──
-    if (chosen == null)
-        chosen = await BaseQuery(requireScript: true, forceInsuranceId: null).FirstOrDefaultAsync();
-
-    // ── 3. Nothing with ScriptCode → return null (by design) ─────────────────
-    if (chosen == null)
-    {
-        Console.WriteLine($"No DrugInsurance found with ScriptCode for NDC: {ndc} and InsuranceId: {insuranceId}");
-        return null;
-    }
-
-    // ── 4. Reimbursement calculation ──────────────────────────────────────────
-    int effectiveInsuranceRxId = chosen.DrugInsurance.InsuranceId;
-
-    var contract = await _context.UserInsuranceContracts
-        .AsNoTracking()
-        .FirstOrDefaultAsync(x => x.UserId       == userId
-                               && x.InsuranceRxId == effectiveInsuranceRxId
-                               && x.IsActive
-                               && (x.EffectiveTo == null || x.EffectiveTo >= DateTime.UtcNow));
-
-    // Most recent active pricing row for this drug + prescriber
-    var pricing = await _context.DrugWholesalerPrescribers
-        .AsNoTracking()
-        .Where(p => p.PrescriberId == userId
-                 && p.Drug.NDC     == ndc
-                 && p.IsActive)
-        .OrderByDescending(p => p.PriceDate)
-        .ThenBy(p=>p.Price)
-        .ThenByDescending(p => p.CreatedAt)
-        .FirstOrDefaultAsync();
-
-    decimal expectInsurancePayment = 0m;
-
-    if (contract != null && pricing != null)
-    {
-        // ── Contract exists → use contracted formula ───────────────────────
-        decimal fee = contract.DispensingFee ?? 0m;
-
-        expectInsurancePayment = contract.ReimbursementType.ToUpperInvariant() switch
+        internal async Task<DrugsAlternativesReadDto?> GetDetails(
+        string ndc,
+        int sourceInsuranceId,
+        int? insuranceId = null,
+        int branchId = 1,
+        int userId = 1)
         {
-            "AWP" when pricing.AWP > 0 =>
-                pricing.AWP!.Value * (1m - (contract.AwpDiscountPercent ?? 0m) / 100m) + fee,
+            if (insuranceId == 0) insuranceId = null;
 
-            "ASP" when pricing.ASP > 0 =>
-                pricing.ASP!.Value * (1m + (contract.AspMarkupPercent ?? 0m) / 100m) + fee,
+            var user = await _context.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == userId);
 
-            "MAC" =>
-                (contract.MacPrice ?? pricing.MAC ?? 0m) + fee,
+            bool isDoctor = user.Role.ToString() == "Doctor";
 
-            "FIXED" =>
-                contract.FixedReimbursementAmount ?? 0m,
+            // ── Base projection ───────────────────────────────────────────────────────
+            IQueryable<dynamic> BaseQuery(bool requireScript, int? forceInsuranceId)
+            {
+                var q =
+                    from di in _context.DrugInsurances.AsNoTracking()
+                    join d in _context.Drugs.AsNoTracking() on di.DrugId equals d.Id
+                    join irx in _context.InsuranceRxes.AsNoTracking() on di.InsuranceId equals irx.Id
+                    join ipcn in _context.InsurancePCNs.AsNoTracking() on irx.InsurancePCNId equals ipcn.Id
+                    join ins in _context.Insurances.AsNoTracking() on ipcn.InsuranceId equals ins.Id
+                    where di.NDCCode == ndc
+                       && d.NDC == ndc
+                       && di.BranchId == branchId
+                       && di.InsuranceId == insuranceId
+                    select new
+                    {
+                        DrugInsurance = di,
+                        Bin = ins.Bin,
+                        BinFullName = ins.Name,
+                        RxGroup = irx.RxGroup,
+                        PCN = ipcn.PCN,
+                        pcnId = ipcn.Id,
+                        rxgroupId = irx.Id,
+                        binId = ins.Id,
+                        Drug = d
+                    };
 
-            _ => 0m
-        };
-    }
-    else if (pricing?.AWP > 0)
-    {
-        // ── No contract → default: AWP − 22% + $0.05 ─────────────────────
-        expectInsurancePayment = pricing.AWP!.Value * (1m - 0.22m) + 0.05m;
-    }
+                if (requireScript)
+                    q = q.Where(x => x.DrugInsurance.ScriptCode != null
+                                  && x.DrugInsurance.ScriptCode != "");
 
-    // ── 5. Insurance statuses ─────────────────────────────────────────────────
-    var statuses = await _context.InsuranceStatuses
-        .Where(s => s.InsuranceRxId == sourceInsuranceId && s.TargetDrugNDC == ndc)
-        .Include(s => s.Reports)
-            .ThenInclude(r => r.User)
-        .AsNoTracking()
-        .ToListAsync();
+                if (forceInsuranceId.HasValue)
+                    q = q.Where(x => x.DrugInsurance.InsuranceId == forceInsuranceId.Value);
 
-    IEnumerable<Report> BranchReports(InsuranceStatus s) =>
-        s.Reports?.Where(r => r.User != null && r.User.BranchId == branchId)
-        ?? Enumerable.Empty<Report>();
+                return q.OrderByDescending(x => x.DrugInsurance.Date)
+                        .ThenByDescending(x => x.DrugInsurance.Id);
+            }
 
-    DateTime LatestReportDate(InsuranceStatus s) =>
-        BranchReports(s)
-            .OrderByDescending(r => r.StatusDate)
-            .Select(r => r.StatusDate)
-            .FirstOrDefault();
+            // ── 1. Try with the provided insurance ────────────────────────────────────
+            var chosen = insuranceId.HasValue
+                ? await BaseQuery(requireScript: true, forceInsuranceId: insuranceId).FirstOrDefaultAsync()
+                : null;
 
-    var latestPAStatusRow = statuses
-        .Where(s => !string.IsNullOrEmpty(s.PriorAuthorizationStatus)
-                 && s.PriorAuthorizationStatus != "NA"
-                 && BranchReports(s).Any())
-        .Select(s => new { Row = s, Latest = LatestReportDate(s) })
-        .OrderByDescending(x => x.Latest)
-        .Select(x => x.Row)
-        .FirstOrDefault();
+            // ── 2. Fallback: any insurance for this NDC ───────────────────────────────
+            if (chosen == null)
+                chosen = await BaseQuery(requireScript: true, forceInsuranceId: null).FirstOrDefaultAsync();
 
-    var latestApprovedStatusRow = statuses
-        .Where(s => !string.IsNullOrEmpty(s.ApprovedStatus)
-                 && s.ApprovedStatus != "NA"
-                 && BranchReports(s).Any())
-        .Select(s => new { Row = s, Latest = LatestReportDate(s) })
-        .OrderByDescending(x => x.Latest)
-        .Select(x => x.Row)
-        .FirstOrDefault();
+            if (chosen == null)
+            {
+                Console.WriteLine($"No DrugInsurance found with ScriptCode for NDC: {ndc} and InsuranceId: {insuranceId}");
+                return null;
+            }
 
-    var latestReport = statuses
-        .SelectMany(s => BranchReports(s))
-        .OrderByDescending(r => r.StatusDate)
-        .FirstOrDefault();
+            int effectiveInsuranceRxId = chosen.DrugInsurance.InsuranceId;
 
-    // ── 6. Build and return DTO ───────────────────────────────────────────────
-    var dto = _mapper.Map<DrugsAlternativesReadDto>(chosen.DrugInsurance);
+            // ── 3. Resolve contract + pricing based on user role ─────────────────────
+            UserInsuranceContract? contract = null;
+            DrugWholesalerPrescriber? pricing = null;
 
-    dto.bin         = chosen.Bin;
-    dto.BinFullName = chosen.BinFullName;
-    dto.rxgroup     = chosen.RxGroup;
-    dto.pcn         = chosen.PCN;
-    dto.pcnId       = chosen.pcnId;
-    dto.rxgroupId   = chosen.rxgroupId;
-    dto.binId       = chosen.binId;
+            if (isDoctor)
+            {
+                // ── Doctor: only his own contract + his own pricing ───────────────────
+                contract = await _context.UserInsuranceContracts
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.UserId == userId
+                                           && x.InsuranceRxId == effectiveInsuranceRxId
+                                           && x.IsActive
+                                           && (x.EffectiveTo == null || x.EffectiveTo >= DateTime.UtcNow));
+
+                pricing = await _context.DrugWholesalerPrescribers
+                    .AsNoTracking()
+                    .Where(p => p.PrescriberId == userId
+                             && p.Drug.NDC == ndc
+                             && p.IsActive)
+                    .OrderByDescending(p => p.PriceDate)
+                    .ThenBy(p => p.Price)
+                    .ThenByDescending(p => p.CreatedAt)
+                    .FirstOrDefaultAsync();
+            }
+            else
+            {
+                // ── Non-doctor (Pharma / Admin): best margin across branch ────────────
+
+                var branchUserIds = await _context.Users
+                    .AsNoTracking()
+                    .Where(u => u.BranchId == branchId)
+                    .Select(u => u.Id)
+                    .ToListAsync();
+
+                // All active contracts for this insurance across the branch
+                var branchContracts = await _context.UserInsuranceContracts
+                    .AsNoTracking()
+                    .Where(c => branchUserIds.Contains(c.UserId)
+                             && c.InsuranceRxId == effectiveInsuranceRxId
+                             && c.IsActive
+                             && (c.EffectiveTo == null || c.EffectiveTo >= DateTime.UtcNow))
+                    .ToListAsync();
+
+                // Latest active pricing per user for this NDC
+                var branchPricing = await _context.DrugWholesalerPrescribers
+                    .AsNoTracking()
+                    .Where(p => branchUserIds.Contains(p.PrescriberId)
+                             && p.Drug.NDC == ndc
+                             && p.IsActive)
+                    .ToListAsync();
+
+                var latestPricingPerUser = branchPricing
+                    .GroupBy(p => p.PrescriberId)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.OrderByDescending(p => p.PriceDate)
+                               .ThenBy(p => p.Price)
+                               .First());
+
+                // Pick best margin across:
+                //   (a) users who have a contract  → use contracted formula
+                //   (b) users who have no contract → use default AWP − 22% + $0.05
+                decimal bestMargin = decimal.MinValue;
+
+                // (a) Contract holders
+                foreach (var c in branchContracts)
+                {
+                    if (!latestPricingPerUser.TryGetValue(c.UserId, out var p)) continue;
+
+                    decimal fee = c.DispensingFee ?? 0m;
+                    decimal reimb = c.ReimbursementType.ToUpperInvariant() switch
+                    {
+                        "AWP" when p.AWP > 0 =>
+                            p.AWP!.Value * (1m - (c.AwpDiscountPercent ?? 0m) / 100m) + fee,
+                        "ASP" when p.ASP > 0 =>
+                            p.ASP!.Value * (1m + (c.AspMarkupPercent ?? 0m) / 100m) + fee,
+                        "MAC" => (c.MacPrice ?? p.MAC ?? 0m) + fee,
+                        "FIXED" => c.FixedReimbursementAmount ?? 0m,
+                        _ => 0m
+                    };
+
+                    decimal margin = reimb + (c.ExpectedPatientPay ?? 0m) - p.Price;
+
+                    if (margin > bestMargin)
+                    {
+                        bestMargin = margin;
+                        contract = c;
+                        pricing = p;
+                    }
+                }
+
+                // (b) Users with pricing but no contract → score with default AWP − 22% + $0.05
+                var contractUserIds = branchContracts.Select(c => c.UserId).ToHashSet();
+
+                foreach (var kvp in latestPricingPerUser)
+                {
+                    if (contractUserIds.Contains(kvp.Key)) continue; // already scored above
+
+                    var p = kvp.Value;
+                    if (p.AWP is null or <= 0) continue;
+
+                    decimal reimb = p.AWP!.Value * (1m - 0.22m) + 0.05m;
+                    decimal margin = reimb - p.Price;  // no patient pay without a contract
+
+                    if (margin > bestMargin)
+                    {
+                        bestMargin = margin;
+                        contract = null;   // no contract for this user
+                        pricing = p;
+                    }
+                }
+            }
+
+            // ── 4. Calculate reimbursement ────────────────────────────────────────────
+            decimal expectInsurancePayment = 0m;
+
+            if (contract != null && pricing != null)
+            {
+                decimal fee = contract.DispensingFee ?? 0m;
+
+                expectInsurancePayment = contract.ReimbursementType.ToUpperInvariant() switch
+                {
+                    "AWP" when pricing.AWP > 0 =>
+                        pricing.AWP!.Value * (1m - (contract.AwpDiscountPercent ?? 0m) / 100m) + fee,
+
+                    "ASP" when pricing.ASP > 0 =>
+                        pricing.ASP!.Value * (1m + (contract.AspMarkupPercent ?? 0m) / 100m) + fee,
+
+                    "MAC" =>
+                        (contract.MacPrice ?? pricing.MAC ?? 0m) + fee,
+
+                    "FIXED" =>
+                        contract.FixedReimbursementAmount ?? 0m,
+
+                    _ => 0m
+                };
+            }
+            else if (pricing?.AWP > 0)
+            {
+                // No contract anywhere → default AWP − 22% + $0.05
+                expectInsurancePayment = pricing.AWP!.Value * (1m - 0.22m) + 0.05m;
+            }
+
+            // ── 5. Patient pay ────────────────────────────────────────────────────────
+            decimal patientPay = contract?.ExpectedPatientPay ?? 0m;
+
+            // ── 6. Insurance statuses ─────────────────────────────────────────────────
+            var statuses = await _context.InsuranceStatuses
+                .Where(s => s.InsuranceRxId == sourceInsuranceId && s.TargetDrugNDC == ndc)
+                .Include(s => s.Reports)
+                    .ThenInclude(r => r.User)
+                .AsNoTracking()
+                .ToListAsync();
+
+            IEnumerable<Report> BranchReports(InsuranceStatus s) =>
+                s.Reports?.Where(r => r.User != null && r.User.BranchId == branchId)
+                ?? Enumerable.Empty<Report>();
+
+            DateTime LatestReportDate(InsuranceStatus s) =>
+                BranchReports(s)
+                    .OrderByDescending(r => r.StatusDate)
+                    .Select(r => r.StatusDate)
+                    .FirstOrDefault();
+
+            var latestPAStatusRow = statuses
+                .Where(s => !string.IsNullOrEmpty(s.PriorAuthorizationStatus)
+                         && s.PriorAuthorizationStatus != "NA"
+                         && BranchReports(s).Any())
+                .Select(s => new { Row = s, Latest = LatestReportDate(s) })
+                .OrderByDescending(x => x.Latest)
+                .Select(x => x.Row)
+                .FirstOrDefault();
+
+            var latestApprovedStatusRow = statuses
+                .Where(s => !string.IsNullOrEmpty(s.ApprovedStatus)
+                         && s.ApprovedStatus != "NA"
+                         && BranchReports(s).Any())
+                .Select(s => new { Row = s, Latest = LatestReportDate(s) })
+                .OrderByDescending(x => x.Latest)
+                .Select(x => x.Row)
+                .FirstOrDefault();
+
+            var latestReport = statuses
+                .SelectMany(s => BranchReports(s))
+                .OrderByDescending(r => r.StatusDate)
+                .FirstOrDefault();
+
+            // ── 7. Build DTO ──────────────────────────────────────────────────────────
+            var dto = _mapper.Map<DrugsAlternativesReadDto>(chosen.DrugInsurance);
+
+            dto.bin = chosen.Bin;
+            dto.BinFullName = chosen.BinFullName;
+            dto.rxgroup = chosen.RxGroup;
+            dto.pcn = chosen.PCN;
+            dto.pcnId = chosen.pcnId;
+            dto.rxgroupId = chosen.rxgroupId;
+            dto.binId = chosen.binId;
 
             dto.Quantity = 1;
-    dto.DrugName = chosen.Drug.Name;
+            dto.AcquisitionCost = pricing?.Price ?? 0m;
+            dto.DrugName = chosen.Drug.Name;
 
-    dto.PriorAuthorizationStatus = latestPAStatusRow?.PriorAuthorizationStatus ?? "NA";
-    dto.ApprovedStatus           = latestApprovedStatusRow?.ApprovedStatus      ?? "NA";
-    dto.Status                   = latestReport?.Status                         ?? "Not Available";
+            dto.PriorAuthorizationStatus = latestPAStatusRow?.PriorAuthorizationStatus ?? "NA";
+            dto.ApprovedStatus = latestApprovedStatusRow?.ApprovedStatus ?? "NA";
+            dto.Status = latestReport?.Status ?? "Not Available";
 
-    // Always assign — contract path uses formula, no-contract path uses default
-    dto.InsurancePayment = expectInsurancePayment;
+            dto.InsurancePayment = expectInsurancePayment;
+            dto.PatientPayment = patientPay;
+            dto.Net = expectInsurancePayment + patientPay - (pricing?.Price ?? 0m);
 
-    return dto;
-}
+            return dto;
+        }
+
         internal async Task<DrugClass> getClassbyId(int id)
         {
             var item = await _context.DrugClasses.FirstOrDefaultAsync(x => x.Id == id);
@@ -4343,6 +4451,13 @@ internal async Task<DrugsAlternativesReadDto?> GetDetails(
                 pageSize = DemoPageSizeLimit;
             }
 
+            // ── Role check ────────────────────────────────────────────────────────────
+            var user = userId > 0
+                ? await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId)
+                : null;
+
+            bool isDoctor = user.Role.ToString() == "Doctor";
+
             var classInfo = await _context.ClassInfos.AsNoTracking()
                 .FirstOrDefaultAsync(ci => ci.Id == classInfoId);
             if (classInfo == null) return EmptyPage(pageNumber, pageSize);
@@ -4385,8 +4500,7 @@ internal async Task<DrugsAlternativesReadDto?> GetDetails(
             }
 
             // ── Pre-filter DrugInsurances ─────────────────────────────────────────────
-            var branch = await _context.Branches
-                .FirstOrDefaultAsync(x => x.Id == branchId);
+            var branch = await _context.Branches.FirstOrDefaultAsync(x => x.Id == branchId);
 
             var diWithScript = _context.DrugInsurances
                 .Include(x => x.Branch)
@@ -4477,105 +4591,222 @@ internal async Task<DrugsAlternativesReadDto?> GetDetails(
             var projected = await query.ToListAsync();
             var branchDict = await _context.Branches.AsNoTracking().ToDictionaryAsync(b => b.Id);
 
-            // ── Bulk load contracts + pricing (two queries for entire page) ───────────
-            var insuranceRxIds = projected
-                .Select(r => r.DrugInsurance.InsuranceId)
-                .Distinct()
-                .ToList();
+            var insuranceRxIds = projected.Select(r => r.DrugInsurance.InsuranceId).Distinct().ToList();
+            var ndcList = projected.Select(r => r.DrugInsurance.NDCCode).Distinct().ToList();
 
-            var ndcList = projected
-                .Select(r => r.DrugInsurance.NDCCode)
-                .Distinct()
-                .ToList();
+            // ── Build pricing + contract lookups based on role ────────────────────────
 
-            // All active contracts this user has for any insurance in the result
-            var contractsMap = new Dictionary<int, UserInsuranceContract>();
-            if (userId > 0 && insuranceRxIds.Any())
+            // Doctor  → keyed by InsuranceRxId (one contract per insurance)
+            //           keyed by NDC           (one pricing row)
+            var doctorContractsMap = new Dictionary<int, UserInsuranceContract>();
+            var doctorPricingMap = new Dictionary<string, DrugWholesalerPrescriber>();
+
+            // Non-doctor → keyed by InsuranceRxId → list of all branch contracts
+            //              keyed by NDC           → latest pricing per branch user
+            var branchContractsMap = new Dictionary<int, List<UserInsuranceContract>>();
+            var branchPricingMap = new Dictionary<string, Dictionary<int, DrugWholesalerPrescriber>>();
+            // branchPricingMap[ndc][userId] = latest pricing row
+
+            if (userId > 0)
             {
-                contractsMap = (await _context.UserInsuranceContracts
-                    .AsNoTracking()
-                    .Where(c => c.UserId == userId
-                             && c.IsActive
-                             && insuranceRxIds.Contains(c.InsuranceRxId)
-                             && (c.EffectiveTo == null || c.EffectiveTo >= DateTime.UtcNow))
-                    .ToListAsync())
-                    .GroupBy(c => c.InsuranceRxId)
-                    .ToDictionary(
-                        g => g.Key,
-                        g => g.OrderByDescending(c => c.EffectiveFrom).First());
+                if (isDoctor)
+                {
+                    // ── Doctor: own contracts + own pricing only ───────────────────────
+                    if (insuranceRxIds.Any())
+                    {
+                        doctorContractsMap = (await _context.UserInsuranceContracts
+                            .AsNoTracking()
+                            .Where(c => c.UserId == userId
+                                     && c.IsActive
+                                     && insuranceRxIds.Contains(c.InsuranceRxId)
+                                     && (c.EffectiveTo == null || c.EffectiveTo >= DateTime.UtcNow))
+                            .ToListAsync())
+                            .GroupBy(c => c.InsuranceRxId)
+                            .ToDictionary(
+                                g => g.Key,
+                                g => g.OrderByDescending(c => c.EffectiveFrom).First());
+                    }
+
+                    if (ndcList.Any())
+                    {
+                        var rows = await _context.DrugWholesalerPrescribers
+                            .AsNoTracking()
+                            .Include(p => p.Drug)
+                            .Where(p => p.PrescriberId == userId
+                                     && p.IsActive
+                                     && ndcList.Contains(p.Drug.NDC))
+                            .ToListAsync();
+
+                        doctorPricingMap = rows
+                            .GroupBy(p => p.Drug.NDC)
+                            .ToDictionary(
+                                g => g.Key,
+                                g => g.OrderByDescending(p => p.PriceDate).First());
+                    }
+                }
+                else
+                {
+                    // ── Non-doctor: all branch users' contracts + pricing ─────────────
+                    var branchUserIds = await _context.Users
+                        .AsNoTracking()
+                        .Where(u => u.BranchId == branchId)
+                        .Select(u => u.Id)
+                        .ToListAsync();
+
+                    if (insuranceRxIds.Any() && branchUserIds.Any())
+                    {
+                        var allContracts = await _context.UserInsuranceContracts
+                            .AsNoTracking()
+                            .Where(c => branchUserIds.Contains(c.UserId)
+                                     && c.IsActive
+                                     && insuranceRxIds.Contains(c.InsuranceRxId)
+                                     && (c.EffectiveTo == null || c.EffectiveTo >= DateTime.UtcNow))
+                            .ToListAsync();
+
+                        // Group by InsuranceRxId → list of contracts (one per user)
+                        branchContractsMap = allContracts
+                            .GroupBy(c => c.InsuranceRxId)
+                            .ToDictionary(
+                                g => g.Key,
+                                g => g.GroupBy(c => c.UserId)
+                                      .Select(ug => ug.OrderByDescending(c => c.EffectiveFrom).First())
+                                      .ToList());
+                    }
+
+                    if (ndcList.Any() && branchUserIds.Any())
+                    {
+                        var allPricing = await _context.DrugWholesalerPrescribers
+                            .AsNoTracking()
+                            .Include(p => p.Drug)
+                            .Where(p => branchUserIds.Contains(p.PrescriberId)
+                                     && p.IsActive
+                                     && ndcList.Contains(p.Drug.NDC))
+                            .ToListAsync();
+
+                        // Group by NDC → dictionary of userId → latest pricing row
+                        branchPricingMap = allPricing
+                            .GroupBy(p => p.Drug.NDC)
+                            .ToDictionary(
+                                g => g.Key,
+                                g => g.GroupBy(p => p.PrescriberId)
+                                      .ToDictionary(
+                                          ug => ug.Key,
+                                          ug => ug.OrderByDescending(p => p.PriceDate).First()));
+                    }
+                }
             }
 
-            // Most recent active pricing row per NDC for this prescriber
-            var pricingMap = new Dictionary<string, DrugWholesalerPrescriber>();
-            if (userId > 0 && ndcList.Any())
-            {
-                var pricingRows = await _context.DrugWholesalerPrescribers
-                    .AsNoTracking()
-                    .Include(p => p.Drug)
-                    .Where(p => p.PrescriberId == userId
-                             && p.IsActive
-                             && ndcList.Contains(p.Drug.NDC))
-                    .ToListAsync();
-
-                pricingMap = pricingRows
-                    .GroupBy(p => p.Drug.NDC)
-                    .ToDictionary(
-                        g => g.Key,
-                        g => g.OrderByDescending(p => p.PriceDate).First());
-            }
-
-            // ── Reimbursement calculation ─────────────────────────────────────────────
+            // ── CalcPayments ──────────────────────────────────────────────────────────
             // Returns (insurancePayment, patientPay, acq)
-            // Priority:
-            //   Contract exists  → use contracted formula + contract.ExpectedPatientPay
-            //   No contract      → default AWP − 22% + $0.05,  patientPay from DrugInsurance
-            //   No AWP snapshot  → 0
             (decimal insurance, decimal patientPay, decimal acq) CalcPayments(
                 string ndc,
                 int insuranceRxId,
                 decimal existingPatientPay)
             {
-                pricingMap.TryGetValue(ndc, out var pricing);
-
-                decimal acq = pricing?.Price ?? 0m;
-
-                // ── Contract path ─────────────────────────────────────────────────────
-                if (contractsMap.TryGetValue(insuranceRxId, out var contract))
+                if (isDoctor)
                 {
-                    decimal fee = contract.DispensingFee ?? 0m;
-                    decimal patientPay = contract.ExpectedPatientPay ?? existingPatientPay;
+                    // ── Doctor path ───────────────────────────────────────────────────
+                    doctorPricingMap.TryGetValue(ndc, out var pricing);
+                    decimal acq = pricing?.Price ?? 0m;
 
-                    if (pricing == null)
-                        return (0m, patientPay, acq);
-
-                    decimal insurance = contract.ReimbursementType.ToUpperInvariant() switch
+                    if (doctorContractsMap.TryGetValue(insuranceRxId, out var contract))
                     {
-                        "AWP" when pricing.AWP > 0 =>
-                            pricing.AWP!.Value * (1m - (contract.AwpDiscountPercent ?? 0m) / 100m) + fee,
+                        decimal fee = contract.DispensingFee ?? 0m;
+                        decimal patientPay = contract.ExpectedPatientPay ?? existingPatientPay;
 
-                        "ASP" when pricing.ASP > 0 =>
-                            pricing.ASP!.Value * (1m + (contract.AspMarkupPercent ?? 0m) / 100m) + fee,
+                        if (pricing == null) return (0m, patientPay, acq);
 
-                        "MAC" =>
-                            (contract.MacPrice ?? pricing.MAC ?? 0m) + fee,
+                        decimal ins = contract.ReimbursementType.ToUpperInvariant() switch
+                        {
+                            "AWP" when pricing.AWP > 0 =>
+                                pricing.AWP!.Value * (1m - (contract.AwpDiscountPercent ?? 0m) / 100m) + fee,
+                            "ASP" when pricing.ASP > 0 =>
+                                pricing.ASP!.Value * (1m + (contract.AspMarkupPercent ?? 0m) / 100m) + fee,
+                            "MAC" => (contract.MacPrice ?? pricing.MAC ?? 0m) + fee,
+                            "FIXED" => contract.FixedReimbursementAmount ?? 0m,
+                            _ => 0m
+                        };
 
-                        "FIXED" =>
-                            contract.FixedReimbursementAmount ?? 0m,
+                        return (ins, patientPay, acq);
+                    }
 
-                        _ => 0m
-                    };
+                    // No contract → default AWP − 22% + $0.05
+                    if (pricing?.AWP > 0)
+                        return (pricing.AWP!.Value * (1m - 0.22m) + 0.05m, existingPatientPay, acq);
 
-                    return (insurance, patientPay, acq);
+                    return (0m, existingPatientPay, acq);
                 }
-
-                // ── No contract → default AWP − 22% + $0.05 ──────────────────────────
-                if (pricing?.AWP > 0)
+                else
                 {
-                    decimal insurance = pricing.AWP!.Value * (1m - 0.22m) + 0.05m;
-                    return (insurance, existingPatientPay, acq);
-                }
+                    // ── Non-doctor path: best margin across branch ────────────────────
+                    branchPricingMap.TryGetValue(ndc, out var pricingByUser);
 
-                return (0m, existingPatientPay, acq);
+                    decimal bestMargin = decimal.MinValue;
+                    decimal bestIns = 0m;
+                    decimal bestPay = existingPatientPay;
+                    decimal bestAcq = 0m;
+
+                    // (a) Score contract holders
+                    if (branchContractsMap.TryGetValue(insuranceRxId, out var contracts))
+                    {
+                        foreach (var c in contracts)
+                        {
+                            decimal fee = c.DispensingFee ?? 0m;
+                            decimal pay = c.ExpectedPatientPay ?? existingPatientPay;
+
+                            if (pricingByUser == null || !pricingByUser.TryGetValue(c.UserId, out var p))
+                                continue;
+
+                            decimal ins = c.ReimbursementType.ToUpperInvariant() switch
+                            {
+                                "AWP" when p.AWP > 0 =>
+                                    p.AWP!.Value * (1m - (c.AwpDiscountPercent ?? 0m) / 100m) + fee,
+                                "ASP" when p.ASP > 0 =>
+                                    p.ASP!.Value * (1m + (c.AspMarkupPercent ?? 0m) / 100m) + fee,
+                                "MAC" => (c.MacPrice ?? p.MAC ?? 0m) + fee,
+                                "FIXED" => c.FixedReimbursementAmount ?? 0m,
+                                _ => 0m
+                            };
+
+                            decimal margin = ins + pay - p.Price;
+                            if (margin > bestMargin)
+                            {
+                                bestMargin = margin;
+                                bestIns = ins;
+                                bestPay = pay;
+                                bestAcq = p.Price;
+                            }
+                        }
+                    }
+
+                    // (b) Score users with pricing but no contract → default AWP − 22% + $0.05
+                    if (pricingByUser != null)
+                    {
+                        var contractUserIds = branchContractsMap.TryGetValue(insuranceRxId, out var cl)
+                            ? cl.Select(c => c.UserId).ToHashSet()
+                            : new HashSet<int>();
+
+                        foreach (var kvp in pricingByUser)
+                        {
+                            if (contractUserIds.Contains(kvp.Key)) continue;
+
+                            var p = kvp.Value;
+                            if (p.AWP is null or <= 0) continue;
+
+                            decimal ins = p.AWP!.Value * (1m - 0.22m) + 0.05m;
+                            decimal margin = ins - p.Price; // no patient pay without contract
+                            if (margin > bestMargin)
+                            {
+                                bestMargin = margin;
+                                bestIns = ins;
+                                bestPay = existingPatientPay;
+                                bestAcq = p.Price;
+                            }
+                        }
+                    }
+
+                    return (bestIns, bestPay, bestAcq);
+                }
             }
 
             // ── Helper ────────────────────────────────────────────────────────────────
@@ -4688,20 +4919,19 @@ internal async Task<DrugsAlternativesReadDto?> GetDetails(
                     .ToList();
             }
 
-            // ── Enrich all DTOs with new net values ───────────────────────────────────
+            // ── Enrich all DTOs ───────────────────────────────────────────────────────
             foreach (var dto in grouped)
             {
                 var (insurance, patientPay, acq) = CalcPayments(
                     dto.NDCCode,
                     dto.rxgroupId,
-                    dto.PatientPayment);   // pass existing PatientPay as fallback
+                    dto.PatientPayment);
 
                 if (insurance > 0 || acq > 0)
                 {
                     dto.InsurancePayment = insurance;
                     dto.PatientPayment = patientPay;
                     dto.AcquisitionCost = acq;
-                    // New net = new reimbursement + patient pay − contracted ACQ
                     dto.Net = insurance + patientPay - acq;
                 }
             }
@@ -4723,14 +4953,15 @@ internal async Task<DrugsAlternativesReadDto?> GetDetails(
                 PageSize = pageSize
             };
         }
+
         private static PagedResult<DrugsAlternativesReadDto> EmptyPage(int pageNumber, int pageSize) => new()
-{
-    Items = Array.Empty<DrugsAlternativesReadDto>(),
-    TotalCount = 0,
-    TotalPages = 0,
-    PageNumber = pageNumber,
-    PageSize = pageSize
-};
+        {
+            Items = Array.Empty<DrugsAlternativesReadDto>(),
+            TotalCount = 0,
+            TotalPages = 0,
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
 
         // --- helpers ---
 
@@ -6086,7 +6317,7 @@ internal async Task<DrugsAlternativesReadDto?> GetDetails(
 
 
         internal async Task<ICollection<Drug>> GetDrugsByInsuranceNamePaginated(
-            string insurance, string drugName, int pageSize, int pageNumber, bool isDemo = false)
+            string insurance, string drugName, int pageSize, int pageNumber, bool isDemo = false, int branchId = 1)
         {
             // Normalize paging
             pageSize = Math.Max(pageSize, 1);
@@ -6096,7 +6327,8 @@ internal async Task<DrugsAlternativesReadDto?> GetDetails(
             // Enable fuzzy search for this session (pg_trgm)
             await _context.Database.ExecuteSqlRawAsync("SET pg_trgm.similarity_threshold = 0.3;");
 
-            // Decide limited-by-RxGroup or global:
+            // Decide limited-by-RxGroup or global
+            // ── branchId is now part of the RxGroup existence check ──────────────────
             bool useGlobal = string.IsNullOrWhiteSpace(insurance);
             if (!useGlobal)
             {
@@ -6105,11 +6337,12 @@ internal async Task<DrugsAlternativesReadDto?> GetDetails(
                     .Join(_context.InsuranceRxes,
                           di => di.InsuranceId,
                           rx => rx.Id,
-                          (di, rx) => new { rx.RxGroup, di.ScriptCode })
+                          (di, rx) => new { rx.RxGroup, di.ScriptCode, di.BranchId })
                     .AnyAsync(x =>
                         x.RxGroup.ToLower() == rxNorm &&
                         x.ScriptCode != null &&
-                        x.ScriptCode != string.Empty);
+                        x.ScriptCode != string.Empty &&
+                        x.BranchId == branchId);          // ← branch-scoped check
             }
 
             int demoLimit = isDemo ? DemoDrugLimit : int.MaxValue;
@@ -6118,6 +6351,7 @@ internal async Task<DrugsAlternativesReadDto?> GetDetails(
 
             if (useGlobal)
             {
+                // ── Global search: all insurances, filtered by branchId ───────────────
                 sql = $@"
 WITH source_drugs AS (
     SELECT *
@@ -6148,7 +6382,8 @@ ranked AS (
         AND EXISTS (
             SELECT 1
             FROM ""DrugInsurances"" di
-            WHERE di.""DrugId"" = d.""Id""
+            WHERE di.""DrugId""    = d.""Id""
+              AND di.""BranchId""  = {branchId}
               AND di.""ScriptCode"" IS NOT NULL
               AND di.""ScriptCode"" <> ''
         )
@@ -6160,6 +6395,7 @@ LIMIT {pageSize} OFFSET {offset};";
             }
             else
             {
+                // ── Insurance-specific search, filtered by branchId + RxGroup ─────────
                 sql = $@"
 WITH source_drugs AS (
     SELECT *
@@ -6191,7 +6427,8 @@ ranked AS (
             SELECT 1
             FROM ""DrugInsurances"" di
             JOIN ""InsuranceRxes"" rx ON rx.""Id"" = di.""InsuranceId""
-            WHERE di.""DrugId"" = d.""Id""
+            WHERE di.""DrugId""    = d.""Id""
+              AND di.""BranchId""  = {branchId}
               AND di.""ScriptCode"" IS NOT NULL
               AND di.""ScriptCode"" <> ''
               AND LOWER(rx.""RxGroup"") = LOWER({insurance})
@@ -6208,6 +6445,7 @@ LIMIT {pageSize} OFFSET {offset};";
                 .AsNoTracking()
                 .ToListAsync();
 
+            // ── Fallback: if insurance-scoped returns nothing, try branch-global ───────
             if (!useGlobal && drugs.Count == 0)
             {
                 FormattableString fallbackSql = $@"
@@ -6240,7 +6478,8 @@ ranked AS (
         AND EXISTS (
             SELECT 1
             FROM ""DrugInsurances"" di
-            WHERE di.""DrugId"" = d.""Id""
+            WHERE di.""DrugId""    = d.""Id""
+              AND di.""BranchId""  = {branchId}
               AND di.""ScriptCode"" IS NOT NULL
               AND di.""ScriptCode"" <> ''
         )
@@ -6258,9 +6497,8 @@ LIMIT {pageSize} OFFSET {offset};";
 
             return drugs;
         }
-
         internal async Task<ICollection<Drug>> GetDrugsByPCNPaginated(
-            string insurance, string drugName, int pageSize, int pageNumber, bool isDemo = false)
+         string insurance, string drugName, int pageSize, int pageNumber, bool isDemo = false, int branchId = 1)
         {
             // Normalize paging
             pageSize = Math.Max(pageSize, 1);
@@ -6271,13 +6509,13 @@ LIMIT {pageSize} OFFSET {offset};";
             await _context.Database.ExecuteSqlRawAsync("SET pg_trgm.similarity_threshold = 0.2;");
 
             // Decide whether to use PCN-limited search or fallback to global
+            // ── branchId is now part of the PCN existence check ──────────────────────
             bool useGlobal = string.IsNullOrWhiteSpace(insurance);
 
             if (!useGlobal)
             {
                 string pcnNorm = insurance.Trim().ToLower();
 
-                // Only consider PCNs that actually have DrugInsurances WITH ScriptCode present
                 useGlobal = !await _context.DrugInsurances
                     .Join(_context.InsuranceRxes,
                           di => di.InsuranceId,
@@ -6286,10 +6524,12 @@ LIMIT {pageSize} OFFSET {offset};";
                     .Join(_context.InsurancePCNs,
                           x => x.rx.InsurancePCNId,
                           p => p.Id,
-                          (x, p) => new { p.PCN, x.di.ScriptCode })
+                          (x, p) => new { p.PCN, x.di.ScriptCode, x.di.BranchId })
                     .AnyAsync(x =>
                         x.PCN.ToLower() == pcnNorm &&
-                        x.ScriptCode != null && x.ScriptCode != "");
+                        x.ScriptCode != null &&
+                        x.ScriptCode != "" &&
+                        x.BranchId == branchId);   // ← branch-scoped check
             }
 
             int demoLimit = isDemo ? DemoDrugLimit : int.MaxValue;
@@ -6298,6 +6538,7 @@ LIMIT {pageSize} OFFSET {offset};";
 
             if (useGlobal)
             {
+                // ── Global: all PCNs, filtered by branchId ────────────────────────────
                 sql = $@"
 WITH source_drugs AS (
     SELECT *
@@ -6328,7 +6569,8 @@ ranked AS (
         AND EXISTS (
             SELECT 1
             FROM ""DrugInsurances"" di
-            WHERE di.""DrugId"" = d.""Id""
+            WHERE di.""DrugId""    = d.""Id""
+              AND di.""BranchId""  = {branchId}
               AND di.""ScriptCode"" IS NOT NULL
               AND di.""ScriptCode"" <> ''
         )
@@ -6340,6 +6582,7 @@ LIMIT {pageSize} OFFSET {offset};";
             }
             else
             {
+                // ── PCN-scoped: filtered by branchId + PCN ────────────────────────────
                 sql = $@"
 WITH source_drugs AS (
     SELECT *
@@ -6360,12 +6603,13 @@ ranked AS (
            similarity(d.""name_unaccent"", unaccent({drugName})) AS sim,
            ts_rank(d.""name_tsv"", plainto_tsquery(unaccent({drugName}))) AS ts_rank
     FROM ""DrugInsurances"" di
-    INNER JOIN source_drugs d ON di.""DrugId"" = d.""Id""
-    INNER JOIN ""InsuranceRxes"" rx ON di.""InsuranceId"" = rx.""Id""
+    INNER JOIN source_drugs d   ON di.""DrugId""         = d.""Id""
+    INNER JOIN ""InsuranceRxes"" rx  ON di.""InsuranceId""   = rx.""Id""
     INNER JOIN ""InsurancePCNs"" pcn ON rx.""InsurancePCNId"" = pcn.""Id""
     WHERE LOWER(pcn.""PCN"") = LOWER({insurance})
-      AND di.""ScriptCode"" IS NOT NULL
-      AND di.""ScriptCode"" <> ''
+      AND di.""BranchId""    = {branchId}
+      AND di.""ScriptCode""  IS NOT NULL
+      AND di.""ScriptCode""  <> ''
       AND (
           d.""name_unaccent"" % unaccent({drugName}) OR
           d.""name_tsv"" @@ plainto_tsquery(unaccent({drugName})) OR
@@ -6384,7 +6628,7 @@ LIMIT {pageSize} OFFSET {offset};";
                 .AsNoTracking()
                 .ToListAsync();
 
-            // Safety net: if limited query returned zero, fallback once to global
+            // ── Fallback: PCN-scoped returned nothing → branch-global ─────────────────
             if (!useGlobal && drugs.Count == 0)
             {
                 FormattableString fallbackSql = $@"
@@ -6417,7 +6661,8 @@ ranked AS (
         AND EXISTS (
             SELECT 1
             FROM ""DrugInsurances"" di
-            WHERE di.""DrugId"" = d.""Id""
+            WHERE di.""DrugId""    = d.""Id""
+              AND di.""BranchId""  = {branchId}
               AND di.""ScriptCode"" IS NOT NULL
               AND di.""ScriptCode"" <> ''
         )
@@ -6435,10 +6680,8 @@ LIMIT {pageSize} OFFSET {offset};";
 
             return drugs;
         }
-
-
         internal async Task<ICollection<Drug>> GetDrugsByBINPaginated(
-          string insurance, string drugName, int pageSize, int pageNumber, bool isDemo = false)
+     string insurance, string drugName, int pageSize, int pageNumber, bool isDemo = false, int branchId = 1)
         {
             // Normalize paging
             pageSize = Math.Max(pageSize, 1);
@@ -6449,13 +6692,13 @@ LIMIT {pageSize} OFFSET {offset};";
             await _context.Database.ExecuteSqlRawAsync("SET pg_trgm.similarity_threshold = 0.2;");
 
             // Decide whether to use BIN-limited search or fallback to global
+            // ── branchId is now part of the BIN existence check ──────────────────────
             bool useGlobal = string.IsNullOrWhiteSpace(insurance);
 
             if (!useGlobal)
             {
                 string binNorm = insurance.Trim().ToLower();
 
-                // Use BIN-limited path only if there is at least one DI row for this BIN WITH ScriptCode present
                 useGlobal = !await _context.DrugInsurances
                     .Join(_context.InsuranceRxes,
                           di => di.InsuranceId,
@@ -6468,17 +6711,19 @@ LIMIT {pageSize} OFFSET {offset};";
                     .Join(_context.Insurances,
                           x => x.pcn.InsuranceId,
                           i => i.Id,
-                          (x, i) => new { i.Bin, x.di.ScriptCode })
+                          (x, i) => new { i.Bin, x.di.ScriptCode, x.di.BranchId })
                     .AnyAsync(x =>
                         x.Bin.ToLower() == binNorm &&
-                        x.ScriptCode != null && x.ScriptCode != "");
+                        x.ScriptCode != null &&
+                        x.ScriptCode != "" &&
+                        x.BranchId == branchId);  // ← branch-scoped check
             }
 
             FormattableString sql;
 
             if (useGlobal)
             {
-                // GLOBAL: only drugs that have at least one DrugInsurance with non-empty ScriptCode
+                // ── Global: all BINs, filtered by branchId ────────────────────────────
                 sql = $@"
 WITH ranked AS (
     SELECT d.*,
@@ -6506,7 +6751,8 @@ WITH ranked AS (
         AND EXISTS (
             SELECT 1
             FROM ""DrugInsurances"" di
-            WHERE di.""DrugId"" = d.""Id""
+            WHERE di.""DrugId""    = d.""Id""
+              AND di.""BranchId""  = {branchId}
               AND di.""ScriptCode"" IS NOT NULL
               AND di.""ScriptCode"" <> ''
         )
@@ -6518,7 +6764,7 @@ LIMIT {pageSize} OFFSET {offset};";
             }
             else
             {
-                // BIN-limited: require ScriptCode on the joined DI row
+                // ── BIN-scoped: filtered by branchId + BIN ────────────────────────────
                 sql = $@"
 WITH ranked AS (
     SELECT d.*,
@@ -6537,11 +6783,12 @@ WITH ranked AS (
            similarity(d.""name_unaccent"", unaccent({drugName})) AS sim,
            ts_rank(d.""name_tsv"", plainto_tsquery(unaccent({drugName}))) AS ts_rank
     FROM ""DrugInsurances"" di
-    INNER JOIN ""Drugs"" d ON di.""DrugId"" = d.""Id""
-    INNER JOIN ""InsuranceRxes"" rx ON di.""InsuranceId"" = rx.""Id""
+    INNER JOIN ""Drugs"" d          ON di.""DrugId""         = d.""Id""
+    INNER JOIN ""InsuranceRxes"" rx  ON di.""InsuranceId""   = rx.""Id""
     INNER JOIN ""InsurancePCNs"" pcn ON rx.""InsurancePCNId"" = pcn.""Id""
-    INNER JOIN ""Insurances"" i ON pcn.""InsuranceId"" = i.""Id""
+    INNER JOIN ""Insurances"" i      ON pcn.""InsuranceId""  = i.""Id""
     WHERE LOWER(i.""Bin"") = LOWER({insurance})
+      AND di.""BranchId""   = {branchId}
       AND di.""ScriptCode"" IS NOT NULL
       AND di.""ScriptCode"" <> ''
       AND (
@@ -6562,7 +6809,7 @@ LIMIT {pageSize} OFFSET {offset};";
                 .AsNoTracking()
                 .ToListAsync();
 
-            // Safety net: if limited query returned zero (race/edge), fallback once to global (still enforcing ScriptCode)
+            // ── Fallback: BIN-scoped returned nothing → branch-global ─────────────────
             if (!useGlobal && drugs.Count == 0)
             {
                 FormattableString fallbackSql = $@"
@@ -6592,7 +6839,8 @@ WITH ranked AS (
         AND EXISTS (
             SELECT 1
             FROM ""DrugInsurances"" di
-            WHERE di.""DrugId"" = d.""Id""
+            WHERE di.""DrugId""    = d.""Id""
+              AND di.""BranchId""  = {branchId}
               AND di.""ScriptCode"" IS NOT NULL
               AND di.""ScriptCode"" <> ''
         )
@@ -6610,7 +6858,6 @@ LIMIT {pageSize} OFFSET {offset};";
 
             return drugs;
         }
-
         internal async Task<ICollection<DrugModal>> GetDrugClassesByInsuranceNamePaginated(
             string insurance,
             string drugClassName,
