@@ -242,6 +242,44 @@ public async Task<IActionResult> EditUser([FromQuery] int userId, [FromBody] Edi
             return Ok(branches);
         }
 
+        [HttpGet("{userId:int}/branches")]
+        [Authorize]
+        public async Task<IActionResult> GetUserBranches(int userId)
+        {
+            var branches = await _userService.GetUserBranchesAdmin(userId);
+            if (branches == null)
+                return NotFound(new { message = "User not found" });
+            return Ok(branches);
+        }
 
+        [HttpPost("{userId:int}/branches")]
+        [Authorize]
+        public async Task<IActionResult> AssignBranch(int userId, [FromBody] AssignBranchDto dto)
+        {
+            var (result, error, statusCode) = await _userService.AssignBranchToUser(userId, dto);
+            if (error != null)
+                return StatusCode(statusCode, new { message = error });
+            return StatusCode(201, result);
+        }
+
+        [HttpDelete("{userId:int}/branches/{branchId:int}")]
+        [Authorize]
+        public async Task<IActionResult> DeactivateBranch(int userId, int branchId)
+        {
+            var (_, error, statusCode) = await _userService.DeactivateUserBranch(userId, branchId);
+            if (error != null)
+                return StatusCode(statusCode, new { message = error });
+            return Ok(new { message = "Branch deactivated" });
+        }
+
+        [HttpPut("{userId:int}/branches/{branchId:int}/default")]
+        [Authorize]
+        public async Task<IActionResult> SetDefaultBranch(int userId, int branchId)
+        {
+            var (result, error, statusCode) = await _userService.SetUserDefaultBranch(userId, branchId);
+            if (error != null)
+                return StatusCode(statusCode, new { message = error });
+            return Ok(result);
+        }
     }
 }

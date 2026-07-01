@@ -225,6 +225,16 @@ var branchDto = new CreateBranchDto
             return await _userRepository.GetUserBranches(userId);
         }
 
+        internal async Task<List<UserBranchReadDto>?> GetUserBranchesAdmin(int userId)
+            => await _userRepository.GetUserBranchesAdmin(userId);
 
+        internal async Task<(UserBranchReadDto? Result, string? Error, int StatusCode)> AssignBranchToUser(int userId, AssignBranchDto dto)
+            => await _userRepository.AssignBranchToUser(userId, dto);
+
+        internal async Task<(bool Success, string? Error, int StatusCode)> DeactivateUserBranch(int userId, int branchId)
+            => await _userRepository.DeactivateUserBranch(userId, branchId);
+
+        internal async Task<(UserBranchReadDto? Result, string? Error, int StatusCode)> SetUserDefaultBranch(int userId, int branchId)
+            => await _userRepository.SetUserDefaultBranch(userId, branchId);
     }
 }
