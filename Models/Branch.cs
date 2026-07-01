@@ -11,5 +11,6 @@ namespace SearchTool_ServerSide.Models
         public int MainCompanyId { get; set; }
         public MainCompany MainCompany { get; set; }
         public ICollection<User> Users { get; set; }
+        public ICollection<UserBranch> UserBranches { get; set; } = new List<UserBranch>();
     }
 }

@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SearchTool_ServerSide.Authentication;
+using SearchTool_ServerSide.Dtos.SearchLogDtos;
 using SearchTool_ServerSide.Models;
 using ServerSide.Models;
 using Newtonsoft.Json;
@@ -156,6 +157,7 @@ public DbSet<MainCompanyFeatureSetting> MainCompanyFeatureSettings { get; set; }
 
 
         public DbSet<UserInsuranceContract> UserInsuranceContracts { get; set; }
+        public DbSet<UserBranch> UserBranches { get; set; }
         // New DbSets for Permissions
 
 
@@ -600,6 +602,98 @@ modelBuilder.Entity<DrugWholesalerPrescriber>()
                     .WithMany()
                     .HasForeignKey(e => e.PcnId)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<UserBranch>(entity =>
+            {
+                entity.HasKey(ub => ub.Id);
+
+                entity.HasIndex(ub => new { ub.UserId, ub.BranchId }).IsUnique();
+                entity.HasIndex(ub => ub.UserId);
+                entity.HasIndex(ub => ub.BranchId);
+
+                entity.HasOne(ub => ub.User)
+                      .WithMany(u => u.UserBranches)
+                      .HasForeignKey(ub => ub.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(ub => ub.Branch)
+                      .WithMany(b => b.UserBranches)
+                      .HasForeignKey(ub => ub.BranchId)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // Pin all DateTime columns to "timestamp with time zone" so that
+            // AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true) does not
+            // cause EF to emit spurious AlterColumn operations in future migrations.
+            modelBuilder.Entity<ClassInsurance>(e =>
+            {
+                e.Property(x => x.Date).HasColumnType("timestamp with time zone");
+                e.Property(x => x.ScriptDateTime).HasColumnType("timestamp with time zone");
+            });
+            modelBuilder.Entity<DiseaseVisibilitySettings>(e =>
+                e.Property(x => x.UpdatedAt).HasColumnType("timestamp with time zone"));
+            modelBuilder.Entity<DrugAlternativeReport>(e =>
+                e.Property(x => x.StatusDate).HasColumnType("timestamp with time zone"));
+            modelBuilder.Entity<DrugDiseaseAddHistory>(e =>
+            {
+                e.Property(x => x.CreatedAt).HasColumnType("timestamp with time zone");
+                e.Property(x => x.EditedAt).HasColumnType("timestamp with time zone");
+            });
+            modelBuilder.Entity<DrugInsurance>(e =>
+                e.Property(x => x.Date).HasColumnType("timestamp with time zone"));
+            modelBuilder.Entity<DrugWholesaler>(e =>
+            {
+                e.Property(x => x.PriceDate).HasColumnType("timestamp with time zone");
+                e.Property(x => x.CreatedAt).HasColumnType("timestamp with time zone");
+                e.Property(x => x.UpdatedAt).HasColumnType("timestamp with time zone");
+            });
+            modelBuilder.Entity<DrugWholesalerPrescriber>(e =>
+            {
+                e.Property(x => x.PriceDate).HasColumnType("timestamp with time zone");
+                e.Property(x => x.CreatedAt).HasColumnType("timestamp with time zone");
+            });
+            modelBuilder.Entity<FeedbackFormEntry>(e =>
+                e.Property(x => x.SubmittedAt).HasColumnType("timestamp with time zone"));
+            modelBuilder.Entity<Log>(e =>
+                e.Property(x => x.Date).HasColumnType("timestamp with time zone"));
+            modelBuilder.Entity<MainCompanyFeatureSetting>(e =>
+            {
+                e.Property(x => x.CreatedAt).HasColumnType("timestamp with time zone");
+                e.Property(x => x.UpdatedAt).HasColumnType("timestamp with time zone");
+            });
+            modelBuilder.Entity<Message>(e =>
+                e.Property(x => x.Timestamp).HasColumnType("timestamp with time zone"));
+            modelBuilder.Entity<Order>(e =>
+                e.Property(x => x.Date).HasColumnType("timestamp with time zone"));
+            modelBuilder.Entity<Product>(e =>
+                e.Property(x => x.CreatedAt).HasColumnType("timestamp with time zone"));
+            modelBuilder.Entity<Report>(e =>
+                e.Property(x => x.StatusDate).HasColumnType("timestamp with time zone"));
+            modelBuilder.Entity<Script>(e =>
+                e.Property(x => x.Date).HasColumnType("timestamp with time zone"));
+            modelBuilder.Entity<ScriptItem>(e =>
+            {
+                e.Property(x => x.DaySupplyEndDate).HasColumnType("timestamp with time zone");
+                e.Property(x => x.RefillDate).HasColumnType("timestamp with time zone");
+            });
+            modelBuilder.Entity<SearchLog>(e =>
+                e.Property(x => x.Date).HasColumnType("timestamp with time zone"));
+            modelBuilder.Entity<SearchLogReadDto>(e =>
+                e.Property(x => x.Date).HasColumnType("timestamp with time zone"));
+            modelBuilder.Entity<UserBranch>(e =>
+                e.Property(x => x.AssignedAt).HasColumnType("timestamp with time zone"));
+            modelBuilder.Entity<UserInsuranceContract>(e =>
+            {
+                e.Property(x => x.EffectiveFrom).HasColumnType("timestamp with time zone");
+                e.Property(x => x.EffectiveTo).HasColumnType("timestamp with time zone");
+                e.Property(x => x.CreatedAt).HasColumnType("timestamp with time zone");
+                e.Property(x => x.UpdatedAt).HasColumnType("timestamp with time zone");
+            });
+            modelBuilder.Entity<Wholesaler>(e =>
+            {
+                e.Property(x => x.CreatedAt).HasColumnType("timestamp with time zone");
+                e.Property(x => x.UpdatedAt).HasColumnType("timestamp with time zone");
             });
 
         }

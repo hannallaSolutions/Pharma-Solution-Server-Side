@@ -219,7 +219,12 @@ var branchDto = new CreateBranchDto
             }
             return EditUserDto ;
         }
-        
-     
+
+        internal async Task<List<UserBranchReadDto>> GetUserBranches(int userId)
+        {
+            return await _userRepository.GetUserBranches(userId);
+        }
+
+
     }
 }

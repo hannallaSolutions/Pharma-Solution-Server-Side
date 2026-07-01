@@ -7,6 +7,7 @@ using SearchTool_ServerSide.Models;
 using SearchTool_ServerSide.Repository;
 using SearchTool_ServerSide.Services;
 using SearchTool_ServerSide.Authorization;
+using System.Collections.Generic;
 
 namespace SearchTool_ServerSide.Controllers
 {
@@ -226,7 +227,21 @@ public async Task<IActionResult> EditUser([FromQuery] int userId, [FromBody] Edi
     return Ok(updatedUser);
 }
 
+        [HttpGet("me/branches")]
+        [Authorize]
+        public async Task<IActionResult> GetMyBranches()
+        {
+            var userData = userAccessToken.tokenData();
+            if (userData == null || string.IsNullOrEmpty(userData.UserId))
+                return Unauthorized(new { message = "Invalid or missing token data" });
 
-    
+            if (!int.TryParse(userData.UserId, out int userId))
+                return BadRequest(new { message = "Invalid user ID format" });
+
+            var branches = await _userService.GetUserBranches(userId);
+            return Ok(branches);
+        }
+
+
     }
 }

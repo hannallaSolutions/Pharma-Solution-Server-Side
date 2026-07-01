@@ -27,6 +27,7 @@ namespace SearchTool_ServerSide.Models
         // public ICollection<UserPermission> UserPermissions { get; set; } = new List<UserPermission>();
 
         public Branch Branch { get; set; }
+        public ICollection<UserBranch> UserBranches { get; set; } = new List<UserBranch>();
         public Role Role { get; set; } = Role.Pharmacist;
 
         // Store your key/IV securely in production!

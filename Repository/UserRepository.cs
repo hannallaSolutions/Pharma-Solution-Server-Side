@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using SearchTool_ServerSide.Data;
 using SearchTool_ServerSide.Dtos.UserDtos;
 using SearchTool_ServerSide.Models;
+using System.Collections.Generic;
 
 namespace SearchTool_ServerSide.Repository
 {
@@ -120,8 +121,51 @@ internal async Task<User?> EditUser(int userId, EditUserDto dto)
             _context.Users.Remove(user);
             await _context.SaveChangesAsync();
             return true;
-            
-    }
+        }
+
+        internal async Task<List<UserBranchReadDto>> GetUserBranches(int userId)
+        {
+            var rows = await _context.UserBranches
+                .Where(ub => ub.UserId == userId)
+                .Include(ub => ub.Branch)
+                    .ThenInclude(b => b.MainCompany)
+                .Select(ub => new UserBranchReadDto
+                {
+                    BranchId        = ub.BranchId,
+                    BranchName      = ub.Branch.Name,
+                    BranchCode      = ub.Branch.Code,
+                    MainCompanyId   = ub.Branch.MainCompanyId,
+                    MainCompanyName = ub.Branch.MainCompany != null ? ub.Branch.MainCompany.Name : string.Empty,
+                    IsDefault       = ub.IsDefault,
+                    IsActive        = ub.IsActive
+                })
+                .ToListAsync();
+
+            // Fallback: UserBranches not yet populated — read from Users.BranchId
+            if (rows.Count == 0)
+            {
+                var user = await _context.Users
+                    .Include(u => u.Branch)
+                        .ThenInclude(b => b.MainCompany)
+                    .FirstOrDefaultAsync(u => u.Id == userId);
+
+                if (user?.Branch != null)
+                {
+                    rows.Add(new UserBranchReadDto
+                    {
+                        BranchId        = user.BranchId,
+                        BranchName      = user.Branch.Name,
+                        BranchCode      = user.Branch.Code,
+                        MainCompanyId   = user.Branch.MainCompanyId,
+                        MainCompanyName = user.Branch.MainCompany?.Name ?? string.Empty,
+                        IsDefault       = true,
+                        IsActive        = true
+                    });
+                }
+            }
+
+            return rows;
+        }
     }
 
 }
