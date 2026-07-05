@@ -317,6 +317,28 @@ internal async Task<User?> EditUser(int userId, EditUserDto dto)
                 IsActive        = true
             }, null, 0);
         }
+
+        // Switches the user's current branch (Users.BranchId) only. Does not touch UserBranch.IsDefault.
+        internal async Task<(bool Success, string? Error, int StatusCode)> SwitchCurrentBranch(int userId, int branchId)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (user == null) return (false, "User not found", 404);
+
+            var branchExists = await _context.Branches.AnyAsync(b => b.Id == branchId);
+            if (!branchExists) return (false, "Branch not found", 404);
+
+            var hasActiveAccess = await _context.UserBranches.AnyAsync(ub =>
+                ub.UserId == userId && ub.BranchId == branchId && ub.IsActive);
+            if (!hasActiveAccess) return (false, "User does not have active access to this branch", 403);
+
+            if (user.BranchId != branchId)
+            {
+                user.BranchId = branchId;
+                await _context.SaveChangesAsync();
+            }
+
+            return (true, null, 0);
+        }
     }
 
 }

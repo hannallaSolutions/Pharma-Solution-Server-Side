@@ -236,5 +236,18 @@ var branchDto = new CreateBranchDto
 
         internal async Task<(UserBranchReadDto? Result, string? Error, int StatusCode)> SetUserDefaultBranch(int userId, int branchId)
             => await _userRepository.SetUserDefaultBranch(userId, branchId);
+
+        internal async Task<(string? AccessToken, string? RefreshToken, int BranchId, string? Error, int StatusCode)> SwitchCurrentBranch(int userId, int branchId)
+        {
+            var (success, error, statusCode) = await _userRepository.SwitchCurrentBranch(userId, branchId);
+            if (!success)
+                return (null, null, 0, error, statusCode);
+
+            var tokens = await Refresh(userId);
+            if (tokens == null)
+                return (null, null, 0, "Failed to generate token", 500);
+
+            return (tokens.Value.accessToken, tokens.Value.refreshToken, branchId, null, 0);
+        }
     }
 }

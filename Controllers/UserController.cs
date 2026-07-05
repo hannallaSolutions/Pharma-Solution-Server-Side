@@ -13,7 +13,7 @@ namespace SearchTool_ServerSide.Controllers
 {
     [ApiController]
     [Route("user")]
-    public class UserController(UserSevice _userService, UserAccessToken userAccessToken, LogRepository _logRepository) : ControllerBase
+    public class UserController(UserSevice _userService, UserAccessToken userAccessToken, LogRepository _logRepository, CurrentBranchService _currentBranchService) : ControllerBase
     {
         [HttpPost("Register")]
         
@@ -227,6 +227,16 @@ public async Task<IActionResult> EditUser([FromQuery] int userId, [FromBody] Edi
     return Ok(updatedUser);
 }
 
+        [HttpGet("me/active-branch")]
+        [Authorize]
+        public async Task<IActionResult> GetMyActiveBranch()
+        {
+            var result = await _currentBranchService.ResolveAsync();
+            if (!result.Success)
+                return StatusCode(result.StatusCode, new { message = result.Error });
+            return Ok(new { branchId = result.BranchId, source = result.Source, message = "OK" });
+        }
+
         [HttpGet("me/branches")]
         [Authorize]
         public async Task<IActionResult> GetMyBranches()
@@ -280,6 +290,38 @@ public async Task<IActionResult> EditUser([FromQuery] int userId, [FromBody] Edi
             if (error != null)
                 return StatusCode(statusCode, new { message = error });
             return Ok(result);
+        }
+
+        [HttpPut("me/current-branch")]
+        [Authorize]
+        public async Task<IActionResult> SwitchCurrentBranch([FromBody] SwitchCurrentBranchDto dto)
+        {
+            var userData = userAccessToken.tokenData();
+            if (userData == null || string.IsNullOrEmpty(userData.UserId))
+                return Unauthorized(new { message = "Invalid or missing token data" });
+
+            if (!int.TryParse(userData.UserId, out int userId))
+                return BadRequest(new { message = "Invalid user ID format" });
+
+            var (accessToken, refreshToken, branchId, error, statusCode) = await _userService.SwitchCurrentBranch(userId, dto.BranchId);
+            if (error != null)
+                return StatusCode(statusCode, new { message = error });
+
+            var cookieOptions = new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.None,
+                Expires = DateTime.UtcNow.AddDays(1)
+            };
+            Response.Cookies.Append("refreshToken", refreshToken, cookieOptions);
+
+            return Ok(new
+            {
+                accessToken,
+                branchId,
+                message = "Current branch switched successfully"
+            });
         }
     }
 }
