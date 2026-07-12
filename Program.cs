@@ -10,7 +10,9 @@ using SearchTool_ServerSide.Logging;
 using SearchTool_ServerSide.Middleware;
 using SearchTool_ServerSide.Models;
 using SearchTool_ServerSide.Repository;
+using SearchTool_ServerSide.Repository.Interfaces;
 using SearchTool_ServerSide.Services;
+using SearchTool_ServerSide.Services.Interfaces;
 using ServerSide;
 using System.Text;
 using System.Text.Json.Serialization;
@@ -107,6 +109,8 @@ builder.Services.AddHttpClient<IGeminiChatService, GeminiChatService>(client =>
 });
 builder.Services.AddScoped<ScriptsRepository>();
 builder.Services.AddScoped<ScriptsService>();
+builder.Services.AddScoped<IDashboardAnalyticsRepository, DashboardAnalyticsRepository>();
+builder.Services.AddScoped<IDashboardAnalyticsService, DashboardAnalyticsService>();
 
 //////////////////////////////////////////////
 builder.Services.AddSwaggerGen();
