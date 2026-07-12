@@ -62,6 +62,7 @@ builder.Services.AddControllers()
     });
 //////////////////////////////////////////////
 builder.Services.AddScoped<UserAccessToken>();
+builder.Services.AddScoped<CurrentBranchService>();
 builder.Services.AddScoped(typeof(IRepository<>), typeof(GenericRepository<>));
 builder.Services.AddScoped<DrugRepository>();
 builder.Services.AddScoped<UserRepository>();
