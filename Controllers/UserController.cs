@@ -66,6 +66,7 @@ public async Task<IActionResult> RegisterDemo([FromBody] DemoRegisterDto dto)
                 HttpOnly = true,
                 Secure = true, // required for SameSite=None
                 SameSite = SameSiteMode.None, // allow cross-site cookie
+                Path = "/",
                 Expires = DateTime.UtcNow.AddDays(1)
             };
             Response.Cookies.Append("refreshToken", tokens.Value.refreshToken, cookieOptions);
@@ -108,8 +109,9 @@ public async Task<IActionResult> RegisterDemo([FromBody] DemoRegisterDto dto)
             var cookieOptions = new CookieOptions
             {
                 HttpOnly = true, // Prevent JavaScript access
-                Secure = true, // HTTPS only
-                SameSite = SameSiteMode.Strict, // Prevent CSRF
+                Secure = true, // required for SameSite=None
+                SameSite = SameSiteMode.None, // allow cross-site cookie
+                Path = "/",
                 Expires = DateTime.UtcNow.AddDays(1) // Expiration time
             };
             Response.Cookies.Append("refreshToken", tokens.Value.refreshToken, cookieOptions);
@@ -312,6 +314,7 @@ public async Task<IActionResult> EditUser([FromQuery] int userId, [FromBody] Edi
                 HttpOnly = true,
                 Secure = true,
                 SameSite = SameSiteMode.None,
+                Path = "/",
                 Expires = DateTime.UtcNow.AddDays(1)
             };
             Response.Cookies.Append("refreshToken", refreshToken, cookieOptions);
