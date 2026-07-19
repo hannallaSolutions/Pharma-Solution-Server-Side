@@ -1,35 +1,59 @@
 name: Deploy to EC2
 
 on:
-  push:
-    branches:
-      - dev
+push:
+branches:
+- dev
 
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
+deploy:
+runs-on: ubuntu-latest
 
-    steps:
-      - name: Deploy to EC2 via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ec2-13-60-62-94.eu-north-1.compute.amazonaws.com
-          username: ec2-user
-          key: ${{ secrets.EC2_SSH_KEY }}
-          timeout: 300s
-          script: |
-            set -e
-            cd /home/ec2-user/src/SearchTool_build || exit
-            git remote set-url origin https://github.com/Mohamed2670/Pharma-Solution-Server-Side.git
-            git fetch --all
-            git reset --hard origin/dev
-            rm -rf ./publish
-            mkdir -p ./publish
-            dotnet clean
-            dotnet build SearchTool-ServerSide.csproj --configuration Release
-            dotnet publish SearchTool-ServerSide.csproj -c Release -o ./publish
-            sudo rsync -av --delete ./publish/ /var/www/kestrel-newdevsearchtool/
-            sudo systemctl restart kestrel-newdevsearchtool.service
-            sudo systemctl restart nginx
-            sudo systemctl status kestrel-newdevsearchtool.service --no-pager
-            sudo journalctl -u kestrel-newdevsearchtool.service -n 30 --no-pager
+```
+steps:
+  - name: Deploy to EC2 via SSH
+    uses: appleboy/ssh-action@v1.0.3
+    with:
+      host: ec2-13-60-62-94.eu-north-1.compute.amazonaws.com
+      username: ec2-user
+      key: ${{ secrets.EC2_SSH_KEY }}
+      timeout: 300s
+      command_timeout: 20m
+      script: |
+        set -e
+
+        REPO_DIR="/home/ec2-user/src/SearchTool_build"
+        REPO_URL="https://github.com/Mohamed2670/Pharma-Solution-Server-Side.git"
+
+        if [ ! -d "$REPO_DIR/.git" ]; then
+          rm -rf "$REPO_DIR"
+          git clone --branch dev "$REPO_URL" "$REPO_DIR"
+        fi
+
+        cd "$REPO_DIR"
+
+        git remote set-url origin "$REPO_URL"
+        git fetch origin dev
+        git reset --hard origin/dev
+
+        rm -rf ./publish
+        mkdir -p ./publish
+
+        dotnet clean SearchTool-ServerSide.csproj
+        dotnet build SearchTool-ServerSide.csproj --configuration Release
+        dotnet publish SearchTool-ServerSide.csproj \
+          --configuration Release \
+          --output ./publish \
+          --no-build
+
+        sudo rsync -av --delete ./publish/ /var/www/kestrel-newdevsearchtool/
+
+        sudo systemctl restart kestrel-newdevsearchtool.service
+        sudo systemctl restart nginx
+
+        sudo systemctl status kestrel-newdevsearchtool.service --no-pager
+        sudo journalctl \
+          -u kestrel-newdevsearchtool.service \
+          -n 30 \
+          --no-pager
+```
