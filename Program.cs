@@ -148,6 +148,7 @@ var allowedOrigins = new[]
     "https://pharmacy.medisearchtool.com",
     "https://medi-dev-test.hanna-west.com",
     "https://medi-beta-dev.brightpointsummit.com",
+    "https://medi-beta-dev.hanna-west.com",
 
     // Development
     "http://localhost:5173",
