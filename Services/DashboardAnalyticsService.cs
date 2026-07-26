@@ -31,76 +31,140 @@ namespace SearchTool_ServerSide.Services
             CancellationToken ct)
         {
             var token = _userAccessToken.tokenData();
+
             if (token == null || !int.TryParse(token.UserId, out int userId))
             {
                 return new List<ScriptAnalyticsDto>();
             }
 
-            bool isSuperAdmin = string.Equals(token.UserRole, "SuperAdmin", StringComparison.OrdinalIgnoreCase);
-            int? tokenBranchId = int.TryParse(token.BranchId, out int parsedTokenBranchId) ? parsedTokenBranchId : (int?)null;
+            bool isSuperAdmin = string.Equals(
+                token.UserRole,
+                "SuperAdmin",
+                StringComparison.OrdinalIgnoreCase);
+
+            bool isDemo = string.Equals(
+                token.UserRole,
+                "Demo",
+                StringComparison.OrdinalIgnoreCase);
+
+            int? tokenBranchId = int.TryParse(
+                token.BranchId,
+                out int parsedTokenBranchId)
+                    ? parsedTokenBranchId
+                    : null;
 
             if (allBranches)
             {
-                // allBranches=true always wins over any submitted branchId, and always means
-                // "every authorized branch under the caller's own Main Company" - for both
-                // SuperAdmin and non-SuperAdmin - never system-wide.
-                var authorizedBranchIds = await GetAllBranchesAuthorizedIdsAsync(userId, isSuperAdmin, tokenBranchId, ct);
+                // allBranches=true overrides any submitted branchId.
+                //
+                // SuperAdmin and Demo can retrieve all branches belonging to the
+                // Main Company resolved from their current token branch.
+                //
+                // Other roles remain limited to their active UserBranches
+                // assignments within that Main Company.
+                var authorizedBranchIds =
+                    await GetAllBranchesAuthorizedIdsAsync(
+                        userId,
+                        isSuperAdmin,
+                        isDemo,
+                        tokenBranchId,
+                        ct);
 
                 if (authorizedBranchIds.Count == 0)
                 {
                     return new List<ScriptAnalyticsDto>();
                 }
 
-                return await _repository.GetScriptsAsync(authorizedBranchIds, dateFrom, dateTo, null, ct);
+                return await _repository.GetScriptsAsync(
+                    authorizedBranchIds,
+                    dateFrom,
+                    dateTo,
+                    null,
+                    ct);
             }
 
-            var accessibleBranchIds = await GetAccessibleBranchIdsAsync(userId, isSuperAdmin, tokenBranchId, ct);
+            // Normal branch-scoped behavior remains unchanged.
+            // Demo does not receive special access here.
+            var accessibleBranchIds =
+                await GetAccessibleBranchIdsAsync(
+                    userId,
+                    isSuperAdmin,
+                    tokenBranchId,
+                    ct);
 
-            // Default to the user's current branch when no branchId query param was sent,
-            // so two users scoped to different branches never see the same combined total.
+            // When no branchId is submitted, use the user's current/token branch.
             int? effectiveBranchId = branchId ?? tokenBranchId;
 
-            // TEMP-LOG: diagnostics for the shared-branch-count investigation. Remove once verified in prod.
+            // TEMP-LOG:
+            // Diagnostics for branch-scope investigation.
+            // Remove after behavior is verified.
             Console.WriteLine(
-                $"TEMP-LOG [DashboardAnalyticsService.GetScriptsAsync] userId={userId} role={token.UserRole} " +
-                $"tokenBranchId={(tokenBranchId?.ToString() ?? "null")} requestedBranchId={(branchId?.ToString() ?? "null")} " +
+                $"TEMP-LOG [DashboardAnalyticsService.GetScriptsAsync] " +
+                $"userId={userId} " +
+                $"role={token.UserRole} " +
+                $"tokenBranchId={(tokenBranchId?.ToString() ?? "null")} " +
+                $"requestedBranchId={(branchId?.ToString() ?? "null")} " +
                 $"effectiveBranchId={(effectiveBranchId?.ToString() ?? "null")} " +
                 $"accessibleBranchIds=[{string.Join(",", accessibleBranchIds)}]");
 
             if (effectiveBranchId.HasValue)
             {
-                if (!isSuperAdmin && !accessibleBranchIds.Contains(effectiveBranchId.Value))
+                if (!isSuperAdmin &&
+                    !accessibleBranchIds.Contains(effectiveBranchId.Value))
                 {
                     return new List<ScriptAnalyticsDto>();
                 }
 
-                return await _repository.GetScriptsAsync(accessibleBranchIds, dateFrom, dateTo, effectiveBranchId, ct);
+                return await _repository.GetScriptsAsync(
+                    accessibleBranchIds,
+                    dateFrom,
+                    dateTo,
+                    effectiveBranchId,
+                    ct);
             }
 
-            // No branchId param and no current branch on the token: only a true SuperAdmin
-            // may fall back to every accessible branch; everyone else gets nothing rather
-            // than an unscoped, cross-branch total.
+            // Without allBranches=true, a user with no branch in the token
+            // must not receive an unscoped cross-branch dataset.
             if (!isSuperAdmin)
             {
                 return new List<ScriptAnalyticsDto>();
             }
 
-            return await _repository.GetScriptsAsync(accessibleBranchIds, dateFrom, dateTo, null, ct);
+            return await _repository.GetScriptsAsync(
+                accessibleBranchIds,
+                dateFrom,
+                dateTo,
+                null,
+                ct);
         }
 
-        // Mirrors CurrentBranchService.ResolveAsync(): SuperAdmin sees every branch,
-        // everyone else is scoped to their active UserBranches assignments, falling
-        // back to the single legacy User.BranchId for users not yet migrated.
-        private async Task<List<int>> GetAccessibleBranchIdsAsync(int userId, bool isSuperAdmin, int? tokenBranchId, CancellationToken ct)
+        // Normal branch authorization:
+        //
+        // SuperAdmin can access every branch.
+        // All other roles, including Demo, are limited to their active
+        // UserBranches assignments.
+        //
+        // If the user has not yet been migrated to UserBranches, the method
+        // falls back to the legacy branch stored in the access token.
+        private async Task<List<int>> GetAccessibleBranchIdsAsync(
+            int userId,
+            bool isSuperAdmin,
+            int? tokenBranchId,
+            CancellationToken ct)
         {
             if (isSuperAdmin)
             {
-                return await _context.Branches.Select(b => b.Id).ToListAsync(ct);
+                return await _context.Branches
+                    .Select(b => b.Id)
+                    .ToListAsync(ct);
             }
 
             var branchIds = await _context.UserBranches
-                .Where(ub => ub.UserId == userId && ub.IsActive)
+                .Where(ub =>
+                    ub.UserId == userId &&
+                    ub.IsActive)
                 .Select(ub => ub.BranchId)
+                .Distinct()
                 .ToListAsync(ct);
 
             if (branchIds.Count == 0 && tokenBranchId.HasValue)
@@ -111,10 +175,24 @@ namespace SearchTool_ServerSide.Services
             return branchIds;
         }
 
-        // "All Branches" always means every authorized branch under the caller's own Main
-        // Company (resolved from their current/token branch) - never system-wide, even for
-        // SuperAdmin, and never broader than a non-SuperAdmin's actual UserBranches assignments.
-        private async Task<List<int>> GetAllBranchesAuthorizedIdsAsync(int userId, bool isSuperAdmin, int? tokenBranchId, CancellationToken ct)
+        // Analytics-only "All Branches" authorization:
+        //
+        // The Main Company is resolved from the user's current/token branch.
+        //
+        // - SuperAdmin: all branches under that Main Company.
+        // - Demo: all branches under that Main Company, temporarily for
+        //   company-wide analytics access.
+        // - Other roles: only their assigned UserBranches that also belong
+        //   to that Main Company.
+        //
+        // This does not modify UserBranches and does not make Demo a real
+        // multi-branch user outside this analytics flow.
+        private async Task<List<int>> GetAllBranchesAuthorizedIdsAsync(
+            int userId,
+            bool isSuperAdmin,
+            bool isDemo,
+            int? tokenBranchId,
+            CancellationToken ct)
         {
             if (!tokenBranchId.HasValue)
             {
@@ -131,25 +209,33 @@ namespace SearchTool_ServerSide.Services
                 return new List<int>();
             }
 
-            if (isSuperAdmin)
+            var companyBranchIds = await _context.Branches
+                .Where(b => b.MainCompanyId == mainCompanyId.Value)
+                .Select(b => b.Id)
+                .Distinct()
+                .ToListAsync(ct);
+
+            if (isSuperAdmin || isDemo)
             {
-                return await _context.Branches
-                    .Where(b => b.MainCompanyId == mainCompanyId.Value)
-                    .Select(b => b.Id)
-                    .ToListAsync(ct);
+                return companyBranchIds;
             }
 
-            // Force the assignment-based branch of GetAccessibleBranchIdsAsync (isSuperAdmin: false)
-            // so we get the user's actual UserBranches assignments, with legacy User.BranchId
-            // fallback - never the SuperAdmin system-wide bypass.
-            var assignedBranchIds = await GetAccessibleBranchIdsAsync(userId, isSuperAdmin: false, tokenBranchId, ct);
-
-            // Main Company is an intersecting safety boundary only - it can narrow
-            // assignedBranchIds, never add a branch the user wasn't already assigned to.
-            return await _context.Branches
-                .Where(b => assignedBranchIds.Contains(b.Id) && b.MainCompanyId == mainCompanyId.Value)
-                .Select(b => b.Id)
+            var assignedBranchIds = await _context.UserBranches
+                .Where(ub =>
+                    ub.UserId == userId &&
+                    ub.IsActive)
+                .Select(ub => ub.BranchId)
+                .Distinct()
                 .ToListAsync(ct);
+
+            if (assignedBranchIds.Count == 0)
+            {
+                assignedBranchIds.Add(tokenBranchId.Value);
+            }
+
+            return companyBranchIds
+                .Intersect(assignedBranchIds)
+                .ToList();
         }
     }
 }

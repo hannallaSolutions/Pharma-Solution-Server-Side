@@ -59,7 +59,11 @@ namespace SearchTool_ServerSide.Repository
                     DrugName = i.Drug != null ? i.Drug.Name : null,
                     NdcCode = i.NDCCode,
                     DrugClass = i.Drug != null
-                        ? i.Drug.DrugClasses.Select(dc => dc.ClassInfo.Name).FirstOrDefault()
+                        ? i.Drug.DrugClasses
+                            .Where(dc => EF.Functions.ILike(dc.ClassInfo.ClassType.Name, "ClassV1"))
+                            .OrderBy(dc => dc.ClassInfo.Id) // stable ordering — mirrors GetDrugClassesByPCNPaginated
+                            .Select(dc => dc.ClassInfo.Name)
+                            .FirstOrDefault()
                         : null,
 
                     // Insurance (ScriptItem.Insurance is an InsuranceRx; the real Insurance
