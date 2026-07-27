@@ -106,6 +106,10 @@ namespace SearchTool_ServerSide.Repository
                         ? ((i.InsurancePayment + i.PatientPayment) - i.AcquisitionCost) / i.Quantity
                         : (decimal?)null,
 
+                    // Imported net profit — raw passthrough of the original
+                    // imported "NP" value, unrelated to the NetProfit formula above.
+                    OriginalNetProfit = i.OriginalNetProfit,
+
                     // Workflow
                     Status = i.Status,
                     RxStatus = i.RxStatus,

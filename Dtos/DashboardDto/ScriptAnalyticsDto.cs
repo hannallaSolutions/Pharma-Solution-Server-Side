@@ -45,6 +45,11 @@ namespace SearchTool_ServerSide.Dtos.DashboardDto
         public decimal NetProfit { get; set; }
         public decimal? NetProfitPerItem { get; set; }
 
+        // Imported net profit — the original "NP" value from the source
+        // import (ScriptItem.OriginalNetProfit), kept separate from the
+        // calculated NetProfit above. Does not replace or affect NetProfit.
+        public decimal? OriginalNetProfit { get; set; }
+
         // Workflow
         public string? Status { get; set; }
         public string? RxStatus { get; set; }
