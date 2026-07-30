@@ -1,11 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using SearchTool_ServerSide.Data;
 using SearchTool_ServerSide.Dtos.DashboardDto;
-using SearchTool_ServerSide.Repository.Interfaces;
 
 namespace SearchTool_ServerSide.Repository
 {
-    public class DashboardAnalyticsRepository : IDashboardAnalyticsRepository
+    public class DashboardAnalyticsRepository
     {
         private readonly SearchToolDBContext _context;
 

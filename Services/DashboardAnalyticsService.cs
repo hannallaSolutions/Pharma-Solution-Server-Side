@@ -2,19 +2,18 @@ using Microsoft.EntityFrameworkCore;
 using SearchTool_ServerSide.Authentication;
 using SearchTool_ServerSide.Data;
 using SearchTool_ServerSide.Dtos.DashboardDto;
-using SearchTool_ServerSide.Repository.Interfaces;
-using SearchTool_ServerSide.Services.Interfaces;
+using SearchTool_ServerSide.Repository;
 
 namespace SearchTool_ServerSide.Services
 {
-    public class DashboardAnalyticsService : IDashboardAnalyticsService
+    public class DashboardAnalyticsService
     {
-        private readonly IDashboardAnalyticsRepository _repository;
+        private readonly DashboardAnalyticsRepository _repository;
         private readonly UserAccessToken _userAccessToken;
         private readonly SearchToolDBContext _context;
 
         public DashboardAnalyticsService(
-            IDashboardAnalyticsRepository repository,
+            DashboardAnalyticsRepository repository,
             UserAccessToken userAccessToken,
             SearchToolDBContext context)
         {

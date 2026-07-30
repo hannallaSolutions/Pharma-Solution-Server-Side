@@ -1,12 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SearchTool_ServerSide.Services.Interfaces;
+using SearchTool_ServerSide.Services;
 
 namespace SearchTool_ServerSide.Controllers
 {
     [ApiController]
     [Route("api/dashboard"), Authorize]
-    public class DashboardController(IDashboardAnalyticsService analyticsService) : ControllerBase
+    public class DashboardController(DashboardAnalyticsService analyticsService) : ControllerBase
     {
         [HttpGet("scripts")]
         [ProducesResponseType(typeof(object), 200)]
