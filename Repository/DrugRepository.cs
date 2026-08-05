@@ -5531,19 +5531,25 @@ namespace SearchTool_ServerSide.Repository
             public string? PHARM_CLASSES { get; set; }
         }
 
-        public async Task<ICollection<AuditReadDto>> GetAllLatestScriptsPaginated(int pageNumber, int pageSize, string classVersion = "ClassV6", string matchOn = "BIN",int mainCompanyId=1,int branchId=0)
+        public async Task<ICollection<AuditReadDto>> GetAllLatestScriptsPaginated(int pageNumber, int pageSize, string classVersion = "ClassV6", string matchOn = "BIN",int mainCompanyId=1,int branchId=0,int userId=0,bool isSuperAdmin=false,bool isDemo=false)
         {
-            // Use classVersion as part of the cache key
-            string cacheKey = $"AllLatestScripts_{classVersion}_{matchOn}_{branchId}";
+            var authorizedBranchIds = await ResolveAuthorizedBranchIdsAsync(userId, isSuperAdmin, isDemo, mainCompanyId, branchId);
+
+            // Cache key includes the caller's actual authorized branch scope
+            // (not just their current branchId) so two users who happen to
+            // share a current branch but have different authorization (e.g.
+            // Demo vs. a single-branch Admin) never share a cached result.
+            string branchScopeKey = authorizedBranchIds.Count == 0
+                ? "none"
+                : string.Join("-", authorizedBranchIds.OrderBy(id => id));
+            string cacheKey = $"AllLatestScripts_{classVersion}_{matchOn}_{branchScopeKey}";
             List<AuditReadDto> allData;
 
             // Try to get the specific classVersion from the cache
             if (!_cache.TryGetValue(cacheKey, out allData) && branchId!=0)
             {
-                Console.WriteLine("Hii the cachKey : " + cacheKey);
-
                 // Cache miss: Load the entire dataset for this classVersion
-                allData = await GetAuditDtosWithBestBeforeOrPrevMonthAsync(classVersion, matchOn,mainCompanyId,branchId);
+                allData = await GetAuditDtosWithBestBeforeOrPrevMonthAsync(classVersion, matchOn,mainCompanyId,authorizedBranchIds);
                 // Set up cache options (e.g., 120 minutes sliding expiration)
                 var cacheOptions = new MemoryCacheEntryOptions()
                     .SetSlidingExpiration(TimeSpan.FromMinutes(120));
@@ -5560,15 +5566,56 @@ namespace SearchTool_ServerSide.Repository
 
             return pagedData;
 
-       
 
+
+        }
+
+        // Mirrors DashboardAnalyticsService.GetAllBranchesAuthorizedIdsAsync /
+        // BranchIntelligenceService.ResolveAuthorizedBranchIdsAsync — duplicated
+        // here per the same established pattern (no shared branch-access
+        // service exists yet in this codebase) so the Pharmacy Review Loss
+        // Prevention / Profit Trend / Revenue Pipeline pipeline never returns
+        // another branch's script data to a user who isn't authorized for it.
+        // SuperAdmin/Demo: every branch under the Main Company. Everyone else:
+        // only their active UserBranches assignments (falling back to their
+        // current token branch if UserBranches hasn't been populated yet).
+        private async Task<List<int>> ResolveAuthorizedBranchIdsAsync(
+            int userId,
+            bool isSuperAdmin,
+            bool isDemo,
+            int mainCompanyId,
+            int tokenBranchId)
+        {
+            var companyBranchIds = await _context.Branches
+                .Where(b => b.MainCompanyId == mainCompanyId)
+                .Select(b => b.Id)
+                .Distinct()
+                .ToListAsync();
+
+            if (isSuperAdmin || isDemo)
+            {
+                return companyBranchIds;
+            }
+
+            var assignedBranchIds = await _context.UserBranches
+                .Where(ub => ub.UserId == userId && ub.IsActive)
+                .Select(ub => ub.BranchId)
+                .Distinct()
+                .ToListAsync();
+
+            if (assignedBranchIds.Count == 0 && tokenBranchId != 0)
+            {
+                assignedBranchIds.Add(tokenBranchId);
+            }
+
+            return companyBranchIds.Intersect(assignedBranchIds).ToList();
         }
 
         private async Task<List<AuditReadDto>> GetAuditDtosWithBestBeforeOrPrevMonthAsync(
             string classTypeName,
             string matchOn,
             int mainCompanyId,
-            int branchId,
+            List<int> authorizedBranchIds,
             bool includeCancelled = true)
         {
             var useAllMatchingClasses = string.Equals(
@@ -5594,6 +5641,7 @@ namespace SearchTool_ServerSide.Repository
                 .Include(si => si.Prescriber)
                 .Where(si =>
                     si.Script.Branch.MainCompanyId == mainCompanyId &&
+                    authorizedBranchIds.Contains(si.Script.BranchId) &&
                     si.Drug.DrugClasses.Any(dc =>
                         dc.ClassInfo.ClassType.Name == classTypeName
                     )
@@ -5607,14 +5655,6 @@ namespace SearchTool_ServerSide.Repository
                     si.Status != "Cancelled"
                 );
             }
-
-            // Optional branch filter:
-            // If branchId > 0, return only this branch.
-            // If branchId <= 0, return all branches for the company.
-            //if (branchId > 0)
-            //{
-            //    query = query.Where(si => si.Script.BranchId == branchId);
-            //}
 
             var scriptItems = await query.ToListAsync();
 

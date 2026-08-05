@@ -107,11 +107,11 @@ namespace SearchTool_ServerSide.Services
             return items;
         }
 
-        internal async Task<ICollection<AuditReadDto>> GetAllLatestScriptsPaginated(int page = 1, int pageSize = 1000, string classVersion = "ClassV1", string matchOn = "BIN",int mainCompanyId=1,int BranchId=1)
+        internal async Task<ICollection<AuditReadDto>> GetAllLatestScriptsPaginated(int page = 1, int pageSize = 1000, string classVersion = "ClassV1", string matchOn = "BIN",int mainCompanyId=1,int BranchId=1,int userId=0,bool isSuperAdmin=false,bool isDemo=false)
         {
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
-            var items = await _drugRepository.GetAllLatestScriptsPaginated(page, pageSize, classVersion, matchOn, mainCompanyId, BranchId);
+            var items = await _drugRepository.GetAllLatestScriptsPaginated(page, pageSize, classVersion, matchOn, mainCompanyId, BranchId, userId, isSuperAdmin, isDemo);
             stopwatch.Stop();
             Console.WriteLine("Total time taken : " + stopwatch.ElapsedMilliseconds);
             return items;

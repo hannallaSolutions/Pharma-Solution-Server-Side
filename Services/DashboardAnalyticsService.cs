@@ -94,18 +94,6 @@ namespace SearchTool_ServerSide.Services
             // When no branchId is submitted, use the user's current/token branch.
             int? effectiveBranchId = branchId ?? tokenBranchId;
 
-            // TEMP-LOG:
-            // Diagnostics for branch-scope investigation.
-            // Remove after behavior is verified.
-            Console.WriteLine(
-                $"TEMP-LOG [DashboardAnalyticsService.GetScriptsAsync] " +
-                $"userId={userId} " +
-                $"role={token.UserRole} " +
-                $"tokenBranchId={(tokenBranchId?.ToString() ?? "null")} " +
-                $"requestedBranchId={(branchId?.ToString() ?? "null")} " +
-                $"effectiveBranchId={(effectiveBranchId?.ToString() ?? "null")} " +
-                $"accessibleBranchIds=[{string.Join(",", accessibleBranchIds)}]");
-
             if (effectiveBranchId.HasValue)
             {
                 if (!isSuperAdmin &&

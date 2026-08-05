@@ -306,7 +306,12 @@ public async Task<IActionResult> GetDetails(
         {
             var userData = userAccessToken.tokenData();
             var mainCompanyId = await branchService.GetMainCompanyByBranchId(int.Parse(userData.BranchId));
-            var items = await _drugService.GetAllLatestScriptsPaginated(pageNumber, pageSize, classVersion, matchOn, mainCompanyId.Id, int.Parse(userData.BranchId));
+
+            bool isSuperAdmin = string.Equals(userData.UserRole, "SuperAdmin", StringComparison.OrdinalIgnoreCase);
+            bool isDemo = string.Equals(userData.UserRole, "Demo", StringComparison.OrdinalIgnoreCase);
+            int.TryParse(userData.UserId, out int userId);
+
+            var items = await _drugService.GetAllLatestScriptsPaginated(pageNumber, pageSize, classVersion, matchOn, mainCompanyId.Id, int.Parse(userData.BranchId), userId, isSuperAdmin, isDemo);
             return Ok(items);
         }
         [HttpGet("GetAllLatestScriptsPaginatedv2"), Authorize]
