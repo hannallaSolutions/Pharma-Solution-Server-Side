@@ -254,41 +254,69 @@ public async Task<IActionResult> EditUser([FromQuery] int userId, [FromBody] Edi
             return Ok(branches);
         }
 
+        // Resolves the calling user's id + SuperAdmin flag for branch-management
+        // authorization. Returns null when the token is missing/invalid, in which
+        // case the caller should respond Unauthorized.
+        private bool TryGetBranchManagementCaller(out int callerId, out bool isSuperAdmin)
+        {
+            callerId = 0;
+            isSuperAdmin = false;
+
+            var caller = userAccessToken.tokenData();
+            if (caller == null || !int.TryParse(caller.UserId, out callerId))
+                return false;
+
+            isSuperAdmin = string.Equals(caller.UserRole, "SuperAdmin", StringComparison.OrdinalIgnoreCase);
+            return true;
+        }
+
         [HttpGet("{userId:int}/branches")]
-        [Authorize]
+        [Authorize(Policy = "Admin")]
         public async Task<IActionResult> GetUserBranches(int userId)
         {
-            var branches = await _userService.GetUserBranchesAdmin(userId);
-            if (branches == null)
-                return NotFound(new { message = "User not found" });
+            if (!TryGetBranchManagementCaller(out int callerId, out bool isSuperAdmin))
+                return Unauthorized(new { message = "Invalid or missing token data" });
+
+            var (branches, error, statusCode) = await _userService.GetUserBranchesAdmin(userId, callerId, isSuperAdmin);
+            if (error != null)
+                return StatusCode(statusCode, new { message = error });
             return Ok(branches);
         }
 
         [HttpPost("{userId:int}/branches")]
-        [Authorize]
+        [Authorize(Policy = "Admin")]
         public async Task<IActionResult> AssignBranch(int userId, [FromBody] AssignBranchDto dto)
         {
-            var (result, error, statusCode) = await _userService.AssignBranchToUser(userId, dto);
+            if (!TryGetBranchManagementCaller(out int callerId, out bool isSuperAdmin))
+                return Unauthorized(new { message = "Invalid or missing token data" });
+
+            var (result, error, statusCode) = await _userService.AssignBranchToUser(userId, dto, callerId, isSuperAdmin);
             if (error != null)
                 return StatusCode(statusCode, new { message = error });
             return StatusCode(201, result);
         }
 
         [HttpDelete("{userId:int}/branches/{branchId:int}")]
-        [Authorize]
+        [Authorize(Policy = "Admin")]
         public async Task<IActionResult> DeactivateBranch(int userId, int branchId)
         {
-            var (_, error, statusCode) = await _userService.DeactivateUserBranch(userId, branchId);
+            if (!TryGetBranchManagementCaller(out int callerId, out bool isSuperAdmin))
+                return Unauthorized(new { message = "Invalid or missing token data" });
+
+            var (_, error, statusCode) = await _userService.DeactivateUserBranch(userId, branchId, callerId, isSuperAdmin);
             if (error != null)
                 return StatusCode(statusCode, new { message = error });
             return Ok(new { message = "Branch deactivated" });
         }
 
         [HttpPut("{userId:int}/branches/{branchId:int}/default")]
-        [Authorize]
+        [Authorize(Policy = "Admin")]
         public async Task<IActionResult> SetDefaultBranch(int userId, int branchId)
         {
-            var (result, error, statusCode) = await _userService.SetUserDefaultBranch(userId, branchId);
+            if (!TryGetBranchManagementCaller(out int callerId, out bool isSuperAdmin))
+                return Unauthorized(new { message = "Invalid or missing token data" });
+
+            var (result, error, statusCode) = await _userService.SetUserDefaultBranch(userId, branchId, callerId, isSuperAdmin);
             if (error != null)
                 return StatusCode(statusCode, new { message = error });
             return Ok(result);

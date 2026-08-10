@@ -225,17 +225,17 @@ var branchDto = new CreateBranchDto
             return await _userRepository.GetUserBranches(userId);
         }
 
-        internal async Task<List<UserBranchReadDto>?> GetUserBranchesAdmin(int userId)
-            => await _userRepository.GetUserBranchesAdmin(userId);
+        internal async Task<(List<UserBranchReadDto>? Result, string? Error, int StatusCode)> GetUserBranchesAdmin(int userId, int callerUserId, bool isSuperAdmin)
+            => await _userRepository.GetUserBranchesAdmin(userId, callerUserId, isSuperAdmin);
 
-        internal async Task<(UserBranchReadDto? Result, string? Error, int StatusCode)> AssignBranchToUser(int userId, AssignBranchDto dto)
-            => await _userRepository.AssignBranchToUser(userId, dto);
+        internal async Task<(UserBranchReadDto? Result, string? Error, int StatusCode)> AssignBranchToUser(int userId, AssignBranchDto dto, int callerUserId, bool isSuperAdmin)
+            => await _userRepository.AssignBranchToUser(userId, dto, callerUserId, isSuperAdmin);
 
-        internal async Task<(bool Success, string? Error, int StatusCode)> DeactivateUserBranch(int userId, int branchId)
-            => await _userRepository.DeactivateUserBranch(userId, branchId);
+        internal async Task<(bool Success, string? Error, int StatusCode)> DeactivateUserBranch(int userId, int branchId, int callerUserId, bool isSuperAdmin)
+            => await _userRepository.DeactivateUserBranch(userId, branchId, callerUserId, isSuperAdmin);
 
-        internal async Task<(UserBranchReadDto? Result, string? Error, int StatusCode)> SetUserDefaultBranch(int userId, int branchId)
-            => await _userRepository.SetUserDefaultBranch(userId, branchId);
+        internal async Task<(UserBranchReadDto? Result, string? Error, int StatusCode)> SetUserDefaultBranch(int userId, int branchId, int callerUserId, bool isSuperAdmin)
+            => await _userRepository.SetUserDefaultBranch(userId, branchId, callerUserId, isSuperAdmin);
 
         internal async Task<(string? AccessToken, string? RefreshToken, int BranchId, string? Error, int StatusCode)> SwitchCurrentBranch(int userId, int branchId)
         {

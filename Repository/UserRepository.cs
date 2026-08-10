@@ -144,36 +144,90 @@ internal async Task<User?> EditUser(int userId, EditUserDto dto)
             // Fallback: UserBranches not yet populated — read from Users.BranchId
             if (rows.Count == 0)
             {
-                var user = await _context.Users
-                    .Include(u => u.Branch)
-                        .ThenInclude(b => b.MainCompany)
-                    .FirstOrDefaultAsync(u => u.Id == userId);
-
-                if (user?.Branch != null)
-                {
-                    rows.Add(new UserBranchReadDto
-                    {
-                        BranchId        = user.BranchId,
-                        BranchName      = user.Branch.Name,
-                        BranchCode      = user.Branch.Code,
-                        MainCompanyId   = user.Branch.MainCompanyId,
-                        MainCompanyName = user.Branch.MainCompany?.Name ?? string.Empty,
-                        IsDefault       = true,
-                        IsActive        = true
-                    });
-                }
+                var fallback = await BuildLegacyBranchFallbackAsync(userId);
+                if (fallback != null)
+                    rows.Add(fallback);
             }
 
             return rows;
         }
 
+        // Synthesizes a single UserBranchReadDto from Users.BranchId for users who
+        // have no UserBranches rows yet — legacy users created before the
+        // UserBranches table existed, or created via Register/RegisterDemo/
+        // InsertUserData (none of which insert a UserBranches row), or missed by
+        // the one-time migration backfill. Mirrors that backfill's shape exactly
+        // (IsDefault = true, IsActive = true). Returns null if the user or their
+        // branch cannot be resolved. Shared by GetUserBranches (self-service) and
+        // GetUserBranchesAdmin so both surfaces agree on a legacy user's branches.
+        private async Task<UserBranchReadDto?> BuildLegacyBranchFallbackAsync(int userId)
+        {
+            var user = await _context.Users
+                .Include(u => u.Branch)
+                    .ThenInclude(b => b.MainCompany)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user?.Branch == null)
+                return null;
+
+            return new UserBranchReadDto
+            {
+                BranchId        = user.BranchId,
+                BranchName      = user.Branch.Name,
+                BranchCode      = user.Branch.Code,
+                MainCompanyId   = user.Branch.MainCompanyId,
+                MainCompanyName = user.Branch.MainCompany?.Name ?? string.Empty,
+                IsDefault       = true,
+                IsActive        = true
+            };
+        }
+
+        // Resolves a user's company id from their current home branch (Users.BranchId).
+        // Returns null if the user or their branch cannot be resolved.
+        private async Task<int?> GetUserCompanyIdAsync(int userId)
+        {
+            var branchId = await _context.Users
+                .Where(u => u.Id == userId)
+                .Select(u => (int?)u.BranchId)
+                .FirstOrDefaultAsync();
+
+            return branchId.HasValue ? await GetCompanyIdForBranchAsync(branchId.Value) : null;
+        }
+
+        private async Task<int?> GetCompanyIdForBranchAsync(int branchId)
+        {
+            return await _context.Branches
+                .Where(b => b.Id == branchId)
+                .Select(b => (int?)b.MainCompanyId)
+                .FirstOrDefaultAsync();
+        }
+
+        // Non-SuperAdmin callers may only manage branch assignments for a target user
+        // and target branch that both belong to the caller's own company. Fails closed
+        // (denies) if any party's company cannot be resolved.
+        private async Task<bool> CanManageCrossEntityAsync(int callerUserId, int targetUserId, int? targetBranchCompanyId = null)
+        {
+            var callerCompanyId = await GetUserCompanyIdAsync(callerUserId);
+            if (callerCompanyId == null) return false;
+
+            var targetUserCompanyId = await GetUserCompanyIdAsync(targetUserId);
+            if (targetUserCompanyId == null || callerCompanyId != targetUserCompanyId) return false;
+
+            if (targetBranchCompanyId.HasValue && callerCompanyId != targetBranchCompanyId.Value) return false;
+
+            return true;
+        }
+
         // Returns null when the user does not exist; empty list when no active branches yet.
-        internal async Task<List<UserBranchReadDto>?> GetUserBranchesAdmin(int userId)
+        internal async Task<(List<UserBranchReadDto>? Result, string? Error, int StatusCode)> GetUserBranchesAdmin(int userId, int callerUserId, bool isSuperAdmin)
         {
             var userExists = await _context.Users.AnyAsync(u => u.Id == userId);
-            if (!userExists) return null;
+            if (!userExists) return (null, "User not found", 404);
 
-            return await _context.UserBranches
+            if (!isSuperAdmin && !await CanManageCrossEntityAsync(callerUserId, userId))
+                return (null, "You are not authorized to view branch assignments outside your own company", 403);
+
+            var rows = await _context.UserBranches
                 .Where(ub => ub.UserId == userId && ub.IsActive)
                 .Include(ub => ub.Branch)
                     .ThenInclude(b => b.MainCompany)
@@ -188,9 +242,20 @@ internal async Task<User?> EditUser(int userId, EditUserDto dto)
                     IsActive        = ub.IsActive
                 })
                 .ToListAsync();
+
+            // Same legacy fallback as GetUserBranches (self-service), so the admin
+            // view and /user/me/branches agree on what a legacy user's branches are.
+            if (rows.Count == 0)
+            {
+                var fallback = await BuildLegacyBranchFallbackAsync(userId);
+                if (fallback != null)
+                    rows.Add(fallback);
+            }
+
+            return (rows, null, 0);
         }
 
-        internal async Task<(UserBranchReadDto? Result, string? Error, int StatusCode)> AssignBranchToUser(int userId, AssignBranchDto dto)
+        internal async Task<(UserBranchReadDto? Result, string? Error, int StatusCode)> AssignBranchToUser(int userId, AssignBranchDto dto, int callerUserId, bool isSuperAdmin)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
             if (user == null) return (null, "User not found", 404);
@@ -200,6 +265,9 @@ internal async Task<User?> EditUser(int userId, EditUserDto dto)
                 .FirstOrDefaultAsync(b => b.Id == dto.BranchId);
             if (branch == null) return (null, "Branch not found", 404);
 
+            if (!isSuperAdmin && !await CanManageCrossEntityAsync(callerUserId, userId, branch.MainCompanyId))
+                return (null, "You are not authorized to manage branch assignments outside your own company", 403);
+
             var existing = await _context.UserBranches
                 .FirstOrDefaultAsync(ub => ub.UserId == userId && ub.BranchId == dto.BranchId);
 
@@ -208,6 +276,41 @@ internal async Task<User?> EditUser(int userId, EditUserDto dto)
 
             var activeCount = await _context.UserBranches
                 .CountAsync(ub => ub.UserId == userId && ub.IsActive);
+
+            // Preserve a legacy Users.BranchId that predates the UserBranches table
+            // (users created via Register/RegisterDemo/InsertUserData, or missed by
+            // the one-time migration backfill). Without this, activeCount == 0 below
+            // would treat the newly requested branch as the user's first and only
+            // branch, and the makeDefault block would overwrite Users.BranchId —
+            // silently losing the legacy branch, since it was never a UserBranches
+            // row to begin with and nothing else records it.
+            // Skipped when the requested branch IS the legacy branch — the normal
+            // insert path below already creates that exact row correctly.
+            if (activeCount == 0 && user.BranchId != 0 && user.BranchId != dto.BranchId)
+            {
+                var legacyExisting = await _context.UserBranches
+                    .FirstOrDefaultAsync(ub => ub.UserId == userId && ub.BranchId == user.BranchId);
+
+                if (legacyExisting == null)
+                {
+                    _context.UserBranches.Add(new UserBranch
+                    {
+                        UserId      = userId,
+                        BranchId    = user.BranchId,
+                        IsDefault   = true,
+                        IsActive    = true,
+                        AssignedAt  = DateTime.UtcNow
+                    });
+                }
+                else if (!legacyExisting.IsActive)
+                {
+                    legacyExisting.IsActive   = true;
+                    legacyExisting.IsDefault  = true;
+                    legacyExisting.AssignedAt = DateTime.UtcNow;
+                }
+
+                activeCount = 1;
+            }
 
             // Force default when this is the first active branch or caller requested it
             bool makeDefault = dto.IsDefault || activeCount == 0;
@@ -255,10 +358,17 @@ internal async Task<User?> EditUser(int userId, EditUserDto dto)
             }, null, 0);
         }
 
-        internal async Task<(bool Success, string? Error, int StatusCode)> DeactivateUserBranch(int userId, int branchId)
+        internal async Task<(bool Success, string? Error, int StatusCode)> DeactivateUserBranch(int userId, int branchId, int callerUserId, bool isSuperAdmin)
         {
             var userExists = await _context.Users.AnyAsync(u => u.Id == userId);
             if (!userExists) return (false, "User not found", 404);
+
+            if (!isSuperAdmin)
+            {
+                var branchCompanyId = await GetCompanyIdForBranchAsync(branchId);
+                if (branchCompanyId == null || !await CanManageCrossEntityAsync(callerUserId, userId, branchCompanyId))
+                    return (false, "You are not authorized to manage branch assignments outside your own company", 403);
+            }
 
             var assignment = await _context.UserBranches
                 .FirstOrDefaultAsync(ub => ub.UserId == userId && ub.BranchId == branchId);
@@ -279,10 +389,17 @@ internal async Task<User?> EditUser(int userId, EditUserDto dto)
             return (true, null, 0);
         }
 
-        internal async Task<(UserBranchReadDto? Result, string? Error, int StatusCode)> SetUserDefaultBranch(int userId, int branchId)
+        internal async Task<(UserBranchReadDto? Result, string? Error, int StatusCode)> SetUserDefaultBranch(int userId, int branchId, int callerUserId, bool isSuperAdmin)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
             if (user == null) return (null, "User not found", 404);
+
+            if (!isSuperAdmin)
+            {
+                var branchCompanyId = await GetCompanyIdForBranchAsync(branchId);
+                if (branchCompanyId == null || !await CanManageCrossEntityAsync(callerUserId, userId, branchCompanyId))
+                    return (null, "You are not authorized to manage branch assignments outside your own company", 403);
+            }
 
             var assignment = await _context.UserBranches
                 .Include(ub => ub.Branch)
