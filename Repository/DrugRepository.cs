@@ -2662,7 +2662,7 @@ namespace SearchTool_ServerSide.Repository
             _context.ScriptItems.AddRange(tempScriptItems.Values);
             await _context.SaveChangesAsync();
         }
-        public async Task<int> ImportDrugInsuranceFileAsync(IFormFile uploadedFile, CancellationToken ct = default)
+        public async Task<int> ImportDrugInsuranceFileAsync(IFormFile uploadedFile,int bracnhId, bool isDemo, CancellationToken ct = default)
         {
             if (uploadedFile == null || uploadedFile.Length == 0)
                 throw new ArgumentException("Uploaded file is empty or missing.", nameof(uploadedFile));
@@ -2706,6 +2706,15 @@ namespace SearchTool_ServerSide.Repository
         "MM/dd/yy"
     };
 
+            if (isDemo == true)
+            {
+                var branch = await _context.Branches.FirstOrDefaultAsync(x => x.Id == bracnhId);
+                var totalScripts = await _context.Scripts.Include(x => x.Branch).Where(x => x.Branch.MainCompanyId == branch.MainCompanyId).CountAsync();
+                if (totalScripts + records.Count() >5000)
+                {
+                    return 0;
+                }
+            }
             // ── Helper: parse any of the supported date formats ──
             bool TryParseRecordDate(string raw, out DateTime parsed)
             {

@@ -39,8 +39,10 @@ namespace SearchTool_ServerSide.Controllers
         {
             if (file == null || file.Length == 0)
                 return BadRequest("No file was uploaded or the file is empty.");
-
-            var items = await _drugService.ImportDrugInsuranceFileAsync(file, ct);
+            var tokenData = userAccessToken.tokenData();
+            bool isDemo = tokenData.UserRole == "Demo" ? true : false;
+           
+            var items = await _drugService.ImportDrugInsuranceFileAsync(file,int.Parse(tokenData.BranchId), isDemo, ct);
 
             return Ok(new
             {
