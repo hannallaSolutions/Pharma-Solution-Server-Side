@@ -66,6 +66,29 @@ public class EmailSenderService
         using var client = new SmtpClient();
 
         await client.ConnectAsync(host, port, SecureSocketOptions.StartTls);
+
+        // TEMPORARY DIAGNOSTICS - remove after debugging 535 auth issue
+        if (_config is IConfigurationRoot diagRoot)
+        {
+            Console.WriteLine("[BrevoDiag] IConfiguration runtime type: " + _config.GetType().FullName);
+            Console.WriteLine("[BrevoDiag] Providers (in load order):");
+            foreach (var p in diagRoot.Providers)
+            {
+                Console.WriteLine("[BrevoDiag]   - " + p.ToString());
+            }
+        }
+        Console.WriteLine($"[BrevoDiag] Host={host}");
+        Console.WriteLine($"[BrevoDiag] Port={port}");
+        Console.WriteLine($"[BrevoDiag] Username={username} UsernameHasLeadingOrTrailingWhitespace={username != username?.Trim()}");
+        Console.WriteLine($"[BrevoDiag] FromEmail={fromEmail}");
+        Console.WriteLine($"[BrevoDiag] FromName={fromName}");
+        Console.WriteLine($"[BrevoDiag] PasswordIsNullOrEmpty={string.IsNullOrEmpty(password)}");
+        Console.WriteLine($"[BrevoDiag] PasswordEqualsPlaceholder={password == "USE_ENV_VARIABLE"}");
+        Console.WriteLine($"[BrevoDiag] PasswordLength={password?.Length ?? 0}");
+        Console.WriteLine($"[BrevoDiag] PasswordStartsWithExpectedPrefix={password?.StartsWith("xsmtpsib-") ?? false}");
+        Console.WriteLine($"[BrevoDiag] PasswordHasLeadingOrTrailingWhitespace={password != password?.Trim()}");
+        // END TEMPORARY DIAGNOSTICS
+
         await client.AuthenticateAsync(username, password);
         await client.SendAsync(message);
         await client.DisconnectAsync(true);
