@@ -22,7 +22,7 @@ jobs:
             set -e
 
             REPO_DIR="/home/ec2-user/src/SearchTool_build"
-            REPO_URL="https://github.com/Mohamed2670/Pharma-Solution-Server-Side.git"
+            REPO_URL="https://github.com/hannallaSolutions/Pharma-Solution-Server-Side.git"
 
             if [ ! -d "$REPO_DIR/.git" ]; then
               rm -rf "$REPO_DIR"
